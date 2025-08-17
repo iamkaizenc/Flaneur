@@ -81,3 +81,33 @@ export const contentListProcedure = publicProcedure
       hasMore: filtered.length > input.limit,
     };
   });
+
+export const contentQueueProcedure = publicProcedure
+  .input(z.object({ itemId: z.string() }))
+  .mutation(async ({ input }) => {
+    console.log(`[Content] Queuing item ${input.itemId}`);
+    return {
+      success: true,
+      message: `Content item ${input.itemId} queued for publishing`,
+    };
+  });
+
+export const contentHoldProcedure = publicProcedure
+  .input(z.object({ itemId: z.string(), reason: z.string().optional() }))
+  .mutation(async ({ input }) => {
+    console.log(`[Content] Holding item ${input.itemId}: ${input.reason || 'Manual hold'}`);
+    return {
+      success: true,
+      message: `Content item ${input.itemId} held`,
+    };
+  });
+
+export const contentRetryProcedure = publicProcedure
+  .input(z.object({ itemId: z.string() }))
+  .mutation(async ({ input }) => {
+    console.log(`[Content] Retrying item ${input.itemId}`);
+    return {
+      success: true,
+      message: `Content item ${input.itemId} queued for retry`,
+    };
+  });

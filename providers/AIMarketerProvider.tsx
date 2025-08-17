@@ -197,14 +197,14 @@ export const [AIMarketerProvider, useAIMarketer] = createContextHook<AIMarketerC
   }), [
     coursePrompts,
     connectedPlatforms,
-    upcomingTasks,
-    todayPublished,
-    contentItems,
-    metrics,
-    insights,
     addCoursePrompt,
     removeCoursePrompt,
     updateSettings,
     connectPlatform,
+    upcomingTasks,
+    todayPublished,
+    contentItems,
+    metrics,
+    insights
   ]);
 });
