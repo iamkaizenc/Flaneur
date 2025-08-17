@@ -87,32 +87,40 @@ export const [AIMarketerProvider, useAIMarketer] = createContextHook<AIMarketerC
   }, []);
 
   const addCoursePrompt = useCallback(async (prompt: string) => {
-    const updated = [...coursePrompts, prompt];
-    setCoursePrompts(updated);
-    await AsyncStorage.setItem("coursePrompts", JSON.stringify(updated));
-  }, [coursePrompts]);
+    setCoursePrompts(prev => {
+      const updated = [...prev, prompt];
+      AsyncStorage.setItem("coursePrompts", JSON.stringify(updated));
+      return updated;
+    });
+  }, []);
 
   const removeCoursePrompt = useCallback(async (index: number) => {
-    const updated = coursePrompts.filter((_, i) => i !== index);
-    setCoursePrompts(updated);
-    await AsyncStorage.setItem("coursePrompts", JSON.stringify(updated));
-  }, [coursePrompts]);
+    setCoursePrompts(prev => {
+      const updated = prev.filter((_, i) => i !== index);
+      AsyncStorage.setItem("coursePrompts", JSON.stringify(updated));
+      return updated;
+    });
+  }, []);
 
   const updateSettings = useCallback(async (newSettings: { focus: string; tone: string; riskLevel: string }) => {
-    const updated = { ...settings, ...newSettings };
-    setSettings(updated);
-    await AsyncStorage.setItem("settings", JSON.stringify(updated));
-  }, [settings]);
+    setSettings(prev => {
+      const updated = { ...prev, ...newSettings };
+      AsyncStorage.setItem("settings", JSON.stringify(updated));
+      return updated;
+    });
+  }, []);
 
   const connectPlatform = useCallback(async (platform: string) => {
-    if (!connectedPlatforms.includes(platform)) {
-      const updated = [...connectedPlatforms, platform];
-      setConnectedPlatforms(updated);
-      await AsyncStorage.setItem("connectedPlatforms", JSON.stringify(updated));
-    }
-  }, [connectedPlatforms]);
+    setConnectedPlatforms(prev => {
+      if (!prev.includes(platform)) {
+        const updated = [...prev, platform];
+        AsyncStorage.setItem("connectedPlatforms", JSON.stringify(updated));
+        return updated;
+      }
+      return prev;
+    });
+  }, []);
 
-  // Load saved data on mount
   useEffect(() => {
     loadSavedData();
   }, [loadSavedData]);
@@ -188,15 +196,15 @@ export const [AIMarketerProvider, useAIMarketer] = createContextHook<AIMarketerC
     connectPlatform,
   }), [
     coursePrompts,
-    addCoursePrompt,
-    removeCoursePrompt,
-    updateSettings,
     connectedPlatforms,
-    connectPlatform,
     upcomingTasks,
     todayPublished,
     contentItems,
     metrics,
     insights,
+    addCoursePrompt,
+    removeCoursePrompt,
+    updateSettings,
+    connectPlatform,
   ]);
 });
