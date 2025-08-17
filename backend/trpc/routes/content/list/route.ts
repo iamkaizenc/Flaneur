@@ -3,7 +3,7 @@ import { publicProcedure } from "../../../create-context";
 
 const contentListInputSchema = z.object({
   limit: z.number().min(1).max(100).default(20),
-  status: z.enum(["draft", "queued", "publishing", "published", "held", "error"]).optional(),
+  status: z.enum(["draft", "queued", "publishing", "published", "held", "failed"]).optional(),
   platform: z.string().optional(),
 });
 
@@ -90,7 +90,7 @@ const mockContent = [
     title: "Analytics Deep Dive",
     body: "Understanding your social media metrics is crucial for growth. Let's explore the key performance indicators that matter.",
     platform: "x",
-    status: "error" as const,
+    status: "failed" as const,
     scheduledAt: new Date(Date.now() - 30 * 60 * 1000).toISOString(),
     publishAttempts: 3,
     createdAt: new Date(Date.now() - 3 * 60 * 60 * 1000),
@@ -131,7 +131,7 @@ export const contentListProcedure = publicProcedure
       queued: mockContent.filter(i => i.status === 'queued').length,
       published: mockContent.filter(i => i.status === 'published').length,
       held: mockContent.filter(i => i.status === 'held').length,
-      error: mockContent.filter(i => i.status === 'error').length
+      failed: mockContent.filter(i => i.status === 'failed').length
     };
     
     const publisherStats = {
@@ -181,17 +181,16 @@ export const contentQueueProcedure = publicProcedure
       const success = Math.random() > 0.2; // 80% success rate
       
       if (success) {
-        item.status = 'published';
+        (item as any).status = 'published';
         item.publishAttempts = 1;
         console.log(`[Content] Item ${item.id} published successfully`);
       } else {
-        item.status = 'error';
+        (item as any).status = 'failed';
         item.publishAttempts = 1;
-        item.platformLimitsInfo = {
-          ...item.platformLimitsInfo,
-          errorMessage: 'Simulated publish error',
+        (item as any).platformLimitsInfo = {
+          publishAttempts: 1,
           lastError: 'PublishError',
-          publishAttempts: 1
+          errorMessage: 'Simulated publish error'
         };
         console.log(`[Content] Item ${item.id} failed to publish`);
       }
@@ -245,7 +244,7 @@ export const contentRetryProcedure = publicProcedure
       throw new Error(`Content item ${input.itemId} not found`);
     }
     
-    if (item.status !== "error" && item.status !== "held") {
+    if (item.status !== "failed" && item.status !== "held") {
       throw new Error(`Cannot retry content with status: ${item.status}`);
     }
     
@@ -261,13 +260,13 @@ export const contentRetryProcedure = publicProcedure
       const success = Math.random() > 0.1; // 90% success rate
       
       if (success) {
-        item.status = 'published';
+        (item as any).status = 'published';
         item.publishAttempts = item.publishAttempts + 1;
         console.log(`[Content] Retry for item ${item.id} succeeded`);
       } else {
-        item.status = 'error';
+        (item as any).status = 'failed';
         item.publishAttempts = item.publishAttempts + 1;
-        item.platformLimitsInfo = {
+        (item as any).platformLimitsInfo = {
           publishAttempts: item.publishAttempts + 1,
           lastError: 'RetryError',
           errorMessage: 'Retry failed - rate limit exceeded'
@@ -312,7 +311,7 @@ export const contentCreateProcedure = publicProcedure
       metrics: null
     };
     
-    mockContent.push(newItem);
+    mockContent.push(newItem as any);
     
     return {
       success: true,
@@ -341,7 +340,7 @@ export const contentStatsProcedure = publicProcedure
       queued: mockContent.filter(i => i.status === 'queued').length,
       published: mockContent.filter(i => i.status === 'published').length,
       held: mockContent.filter(i => i.status === 'held').length,
-      error: mockContent.filter(i => i.status === 'error').length
+      failed: mockContent.filter(i => i.status === 'failed').length
     };
     
     return {
