@@ -176,21 +176,36 @@ export default function SettingsScreen() {
 
   const handleConnect = async (platform: string) => {
     try {
-      const result = await settingsConnectMutation.mutateAsync({ platform: platform as any });
-      if (result.redirectUrl === "DIRECT_SETUP") {
+      const result = await settingsConnectMutation.mutateAsync({ platform: platform.toLowerCase() as any });
+      
+      if (result.requiresBotToken) {
         Alert.alert(
           "Telegram Setup",
-          "Please add your bot token in the Telegram settings section.",
+          result.message + "\n\n" + result.instructions,
           [{ text: "OK" }]
         );
-      } else {
+      } else if (result.authUrl) {
+        console.log(`[OAuth] Opening auth URL for ${platform}:`, result.authUrl);
         Alert.alert(
           "Connect Account",
-          `Redirect to: ${result.redirectUrl}`,
-          [{ text: "OK" }]
+          `Opening OAuth flow for ${platform}. In a real app, this would open the browser.`,
+          [
+            { text: "Cancel", style: "cancel" },
+            { 
+              text: "Connect", 
+              onPress: () => {
+                // In DRY_RUN mode, simulate successful connection
+                setTimeout(() => {
+                  settingsQuery.refetch();
+                  Alert.alert("Success", `${platform} connected successfully (DRY_RUN mode)`);
+                }, 1000);
+              }
+            }
+          ]
         );
       }
     } catch (error) {
+      console.error('[OAuth] Connection error:', error);
       Alert.alert("Error", "Failed to connect account");
     }
   };

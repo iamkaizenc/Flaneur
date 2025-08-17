@@ -120,22 +120,39 @@ export const settingsUpdateProcedure = publicProcedure
 
 export const settingsConnectProcedure = publicProcedure
   .input(z.object({
-    platform: z.enum(["X", "Instagram", "LinkedIn", "TikTok", "Facebook", "Telegram"]),
+    platform: z.enum(["x", "instagram", "linkedin", "tiktok", "facebook", "telegram"]),
   }))
-  .mutation(async ({ input }: { input: { platform: "X" | "Instagram" | "LinkedIn" | "TikTok" | "Facebook" | "Telegram" } }) => {
-    // Mock OAuth start URL generation
-    const mockUrls = {
-      X: "https://twitter.com/i/oauth2/authorize?response_type=code&client_id=mock&redirect_uri=http://localhost:3000/api/oauth/x/callback&scope=tweet.read%20tweet.write%20users.read",
-      Instagram: "https://api.instagram.com/oauth/authorize?client_id=mock&redirect_uri=http://localhost:3000/api/oauth/instagram/callback&scope=user_profile,user_media&response_type=code",
-      LinkedIn: "https://www.linkedin.com/oauth/v2/authorization?response_type=code&client_id=mock&redirect_uri=http://localhost:3000/api/oauth/linkedin/callback&scope=w_member_social",
-      TikTok: "https://www.tiktok.com/auth/authorize/?client_key=mock&response_type=code&scope=user.info.basic,video.list&redirect_uri=http://localhost:3000/api/oauth/tiktok/callback",
-      Facebook: "https://www.facebook.com/v18.0/dialog/oauth?client_id=mock&redirect_uri=http://localhost:3000/api/oauth/facebook/callback&scope=pages_manage_posts,pages_read_engagement&response_type=code",
-      Telegram: "DIRECT_SETUP", // Special case for Telegram
+  .mutation(async ({ input }) => {
+    if (input.platform === 'telegram') {
+      return {
+        requiresBotToken: true,
+        message: 'Telegram uses bot token authentication. Please configure TELEGRAM_BOT_TOKEN in your environment.',
+        instructions: 'Create a bot via @BotFather and add the token to your .env file'
+      };
+    }
+    
+    // Generate OAuth URL directly
+    const state = Math.random().toString(36).substring(2, 15);
+    const redirectUri = 'http://localhost:3000/oauth/' + input.platform + '/callback';
+    
+    const oauthUrls: Record<string, string> = {
+      x: `https://twitter.com/i/oauth2/authorize?response_type=code&client_id=${process.env.TWITTER_CLIENT_ID}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=tweet.read%20tweet.write%20users.read&state=${state}`,
+      instagram: `https://api.instagram.com/oauth/authorize?client_id=${process.env.INSTAGRAM_APP_ID}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=user_profile,user_media&response_type=code&state=${state}`,
+      linkedin: `https://www.linkedin.com/oauth/v2/authorization?response_type=code&client_id=${process.env.LINKEDIN_CLIENT_ID}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=w_member_social&state=${state}`,
+      tiktok: `https://www.tiktok.com/auth/authorize/?client_key=${process.env.TIKTOK_CLIENT_KEY}&response_type=code&scope=user.info.basic,video.list&redirect_uri=${encodeURIComponent(redirectUri)}&state=${state}`,
+      facebook: `https://www.facebook.com/v18.0/dialog/oauth?client_id=${process.env.FACEBOOK_APP_ID}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=pages_manage_posts,pages_read_engagement&response_type=code&state=${state}`
     };
     
+    const authUrl = oauthUrls[input.platform];
+    if (!authUrl) {
+      throw new Error(`OAuth not supported for platform: ${input.platform}`);
+    }
+    
     return {
-      redirectUrl: mockUrls[input.platform as keyof typeof mockUrls],
-      platform: input.platform,
+      success: true,
+      authUrl,
+      state,
+      platform: input.platform
     };
   });
 

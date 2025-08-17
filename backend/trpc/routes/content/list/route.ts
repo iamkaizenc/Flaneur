@@ -181,7 +181,8 @@ export const contentQueueProcedure = publicProcedure
       const success = Math.random() > 0.2; // 80% success rate
       
       if (success) {
-        (item as any).status = 'queued';
+        (item as any).status = 'published';
+        (item as any).publishedAt = new Date().toISOString();
         item.publishAttempts = 1;
         console.log(`[Content] Item ${item.id} published successfully`);
       } else {
@@ -260,7 +261,8 @@ export const contentRetryProcedure = publicProcedure
       const success = Math.random() > 0.1; // 90% success rate
       
       if (success) {
-        (item as any).status = 'queued';
+        (item as any).status = 'published';
+        (item as any).publishedAt = new Date().toISOString();
         item.publishAttempts = item.publishAttempts + 1;
         console.log(`[Content] Retry for item ${item.id} succeeded`);
       } else {
