@@ -1,6 +1,6 @@
 import { Tabs } from "expo-router";
 import React from "react";
-import { Activity, Compass, Calendar, TrendingUp } from "lucide-react-native";
+import { Activity, Compass, Calendar, TrendingUp, Settings } from "lucide-react-native";
 import { theme } from "@/constants/theme";
 
 export default function TabLayout() {
@@ -54,6 +54,15 @@ export default function TabLayout() {
           title: "Growth",
           tabBarIcon: ({ color, size }) => (
             <TrendingUp size={size} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="settings"
+        options={{
+          title: "Settings",
+          tabBarIcon: ({ color, size }) => (
+            <Settings size={size} color={color} />
           ),
         }}
       />

@@ -23,6 +23,7 @@ import {
 import { router } from "expo-router";
 import { useAIMarketer } from "@/providers/AIMarketerProvider";
 import { theme, brandName } from "@/constants/theme";
+import { trpc } from "@/lib/trpc";
 
 type ContentStatus = "draft" | "queued" | "published" | "held";
 
@@ -100,8 +101,13 @@ const ContentCard: React.FC<ContentCardProps> = ({
 );
 
 export default function ContentScreen() {
-  const { contentItems } = useAIMarketer();
   const [selectedFilter, setSelectedFilter] = useState<ContentStatus | "all">("all");
+  const contentQuery = trpc.content.list.useQuery({
+    limit: 50,
+    status: selectedFilter === "all" ? undefined : selectedFilter,
+  });
+  
+  const contentItems = contentQuery.data?.items || [];
 
   const filters: Array<{ label: string; value: ContentStatus | "all"; count: number }> = [
     { label: "All", value: "all", count: contentItems.length },
@@ -111,9 +117,7 @@ export default function ContentScreen() {
     { label: "Draft", value: "draft", count: contentItems.filter(i => i.status === "draft").length },
   ];
 
-  const filteredContent = selectedFilter === "all" 
-    ? contentItems 
-    : contentItems.filter(item => item.status === selectedFilter);
+  const filteredContent = contentItems;
 
   const handleContentPress = (contentId: string) => {
     router.push({

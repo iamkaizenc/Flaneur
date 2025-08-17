@@ -23,6 +23,7 @@ import {
 } from "lucide-react-native";
 import { useAIMarketer } from "@/providers/AIMarketerProvider";
 import { theme, brandName } from "@/constants/theme";
+import { trpc } from "@/lib/trpc";
 
 const { width } = Dimensions.get('window');
 
@@ -109,7 +110,8 @@ const SimpleChart = ({ data }: { data: number[] }) => {
 };
 
 export default function GrowthScreen() {
-  const { metrics, insights } = useAIMarketer();
+  const { metrics } = useAIMarketer();
+  const insightsQuery = trpc.insights.list.useQuery({ range: "7d" });
 
   return (
     <SafeAreaView style={styles.container}>
@@ -160,15 +162,15 @@ export default function GrowthScreen() {
         <View style={styles.insightsSection}>
           <Text style={styles.sectionTitle}>This Week's Insights</Text>
           <View style={styles.insightsList}>
-            {insights.map((insight, index) => (
+            {insightsQuery.data?.insights.map((insight) => (
               <InsightCard
-                key={index}
+                key={insight.id}
                 type={insight.type}
                 title={insight.title}
                 description={insight.description}
-                action={insight.action}
+                action={insight.suggestedAction}
               />
-            ))}
+            )) || []}
           </View>
         </View>
 
