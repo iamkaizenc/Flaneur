@@ -323,17 +323,8 @@ export const contentCreateProcedure = publicProcedure
       metrics: null
     };
     
-    // Add platform limits info for new items
-    const itemWithLimits = {
-      ...newItem,
-      platformLimitsInfo: {
-        textLength: input.body.length,
-        maxLength: input.platform === 'x' ? 280 : 3000,
-        hasMedia: !!input.mediaUrl
-      }
-    };
-    
-    mockContent.push(itemWithLimits as any);
+    // Add to mock content
+    mockContent.push(newItem as any);
     
     return {
       success: true,

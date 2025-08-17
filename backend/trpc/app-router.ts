@@ -1,6 +1,13 @@
 import { createTRPCRouter } from "./create-context";
 import hiRoute from "./routes/example/hi/route";
-import { oauthStartProcedure, oauthCallbackProcedure, oauthRefreshProcedure, oauthRevokeProcedure } from "./routes/oauth/route";
+import { 
+  oauthStartProcedure, 
+  oauthCallbackProcedure, 
+  oauthRefreshProcedure, 
+  oauthRevokeProcedure,
+  oauthListAccountsProcedure,
+  oauthFixProcedure
+} from "./routes/oauth/route";
 import { contentListProcedure, contentQueueProcedure, contentHoldProcedure, contentRetryProcedure, contentCreateProcedure, contentStatsProcedure } from "./routes/content/list/route";
 import { insightsListProcedure } from "./routes/insights/list/route";
 import { settingsGetProcedure, settingsUpdateProcedure, settingsConnectProcedure, settingsDisconnectProcedure, settingsTestNotificationProcedure, settingsGetHealthProcedure, settingsGetVersionProcedure } from "./routes/settings/route";
@@ -21,6 +28,8 @@ export const appRouter = createTRPCRouter({
     callback: oauthCallbackProcedure,
     refresh: oauthRefreshProcedure,
     revoke: oauthRevokeProcedure,
+    listAccounts: oauthListAccountsProcedure,
+    fix: oauthFixProcedure,
   }),
   content: createTRPCRouter({
     list: contentListProcedure,
