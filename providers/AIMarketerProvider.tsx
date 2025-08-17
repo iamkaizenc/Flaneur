@@ -86,11 +86,6 @@ export const [AIMarketerProvider, useAIMarketer] = createContextHook<AIMarketerC
     }
   }, []);
 
-  // Load saved data on mount
-  useEffect(() => {
-    loadSavedData();
-  }, [loadSavedData]);
-
   const addCoursePrompt = useCallback(async (prompt: string) => {
     const updated = [...coursePrompts, prompt];
     setCoursePrompts(updated);
@@ -117,83 +112,91 @@ export const [AIMarketerProvider, useAIMarketer] = createContextHook<AIMarketerC
     }
   }, [connectedPlatforms]);
 
-  return useMemo(() => {
-    // Mock data
-    const currentStatus = "Crafting LinkedIn thought leadership piece → 3 min remaining";
-    
-    const upcomingTasks = [
-      { title: "Autonomous marketing manifesto", status: "Scheduled", platform: "X", time: "12:30 PM" },
-      { title: "Industry insights synthesis", status: "In Queue", platform: "LinkedIn", time: "2:00 PM" },
-      { title: "Visual storytelling piece", status: "Processing", platform: "Instagram", time: "4:30 PM" },
-    ];
+  // Load saved data on mount
+  useEffect(() => {
+    loadSavedData();
+  }, [loadSavedData]);
 
-    const todayPublished = [
-      { title: "Minimalist design philosophy", platform: "X", time: "9:00 AM", impressions: "1.2k", engagement: "4.5" },
-      { title: "Autonomous creativity showcase", platform: "Instagram", time: "11:00 AM", impressions: "856", engagement: "6.2" },
-      { title: "Future of social intelligence", platform: "LinkedIn", time: "1:00 PM", impressions: "432", engagement: "3.8" },
-    ];
+  // Mock data - moved outside useMemo to avoid recreating on every render
+  const currentStatus = "Crafting LinkedIn thought leadership piece → 3 min remaining";
+  
+  const upcomingTasks = useMemo(() => [
+    { title: "Autonomous marketing manifesto", status: "Scheduled", platform: "X", time: "12:30 PM" },
+    { title: "Industry insights synthesis", status: "In Queue", platform: "LinkedIn", time: "2:00 PM" },
+    { title: "Visual storytelling piece", status: "Processing", platform: "Instagram", time: "4:30 PM" },
+  ], []);
 
-    const contentItems: ContentItem[] = [
-      { id: "1", title: "The Art of Autonomous Marketing", platform: "LinkedIn", status: "published", scheduledTime: "Today, 9:00 AM", preview: "Discover how Flâneur transforms social media strategy through intelligent automation..." },
-      { id: "2", title: "Minimalist Content Strategy", platform: "X", status: "queued", scheduledTime: "Today, 2:00 PM", preview: "5 principles of elegant social media presence with Flâneur's autonomous approach..." },
-      { id: "3", title: "Behind the Algorithm", platform: "Instagram", status: "queued", scheduledTime: "Today, 4:00 PM", preview: "An intimate look at Flâneur's sophisticated content creation process..." },
-      { id: "4", title: "Weekly Insights", platform: "Telegram", status: "draft", scheduledTime: "Tomorrow, 10:00 AM", preview: "This week's curated insights on autonomous social media management..." },
-      { id: "5", title: "Platform Evolution", platform: "LinkedIn", status: "held", scheduledTime: "Tomorrow, 12:00 PM", preview: "Announcing Flâneur's next-generation autonomous features..." },
-    ];
+  const todayPublished = useMemo(() => [
+    { title: "Minimalist design philosophy", platform: "X", time: "9:00 AM", impressions: "1.2k", engagement: "4.5" },
+    { title: "Autonomous creativity showcase", platform: "Instagram", time: "11:00 AM", impressions: "856", engagement: "6.2" },
+    { title: "Future of social intelligence", platform: "LinkedIn", time: "1:00 PM", impressions: "432", engagement: "3.8" },
+  ], []);
 
-    const metrics = {
-      followers: "12.4k",
-      followersChange: 12,
-      impressions: "45.2k",
-      impressionsChange: 24,
-      engagement: "8.4%",
-      engagementChange: -5,
-      comments: "342",
-      commentsChange: 18,
-      growthData: [65, 72, 68, 85, 92, 78, 95],
-    };
+  const contentItems: ContentItem[] = useMemo(() => [
+    { id: "1", title: "The Art of Autonomous Marketing", platform: "LinkedIn", status: "published", scheduledTime: "Today, 9:00 AM", preview: "Discover how Flâneur transforms social media strategy through intelligent automation..." },
+    { id: "2", title: "Minimalist Content Strategy", platform: "X", status: "queued", scheduledTime: "Today, 2:00 PM", preview: "5 principles of elegant social media presence with Flâneur's autonomous approach..." },
+    { id: "3", title: "Behind the Algorithm", platform: "Instagram", status: "queued", scheduledTime: "Today, 4:00 PM", preview: "An intimate look at Flâneur's sophisticated content creation process..." },
+    { id: "4", title: "Weekly Insights", platform: "Telegram", status: "draft", scheduledTime: "Tomorrow, 10:00 AM", preview: "This week's curated insights on autonomous social media management..." },
+    { id: "5", title: "Platform Evolution", platform: "LinkedIn", status: "held", scheduledTime: "Tomorrow, 12:00 PM", preview: "Announcing Flâneur's next-generation autonomous features..." },
+  ], []);
 
-    const insights: Insight[] = [
-      {
-        type: "opportunity",
-        title: "Optimal Engagement Window",
-        description: "Your audience demonstrates peak activity between 11 AM - 1 PM. Flâneur recommends concentrating content distribution during this refined timeframe.",
-        action: "Optimize Schedule"
-      },
-      {
-        type: "anomaly",
-        title: "X Platform Performance Shift",
-        description: "X engagement metrics declined 40% this week. Evening content underperforming against historical benchmarks.",
-        action: "Refine Strategy"
-      },
-      {
-        type: "opportunity",
-        title: "Trending Convergence",
-        description: "#AutonomousMarketing aligns with your brand positioning. Flâneur can craft sophisticated content leveraging this momentum.",
-        action: "Generate Content"
-      },
-    ];
+  const metrics = useMemo(() => ({
+    followers: "12.4k",
+    followersChange: 12,
+    impressions: "45.2k",
+    impressionsChange: 24,
+    engagement: "8.4%",
+    engagementChange: -5,
+    comments: "342",
+    commentsChange: 18,
+    growthData: [65, 72, 68, 85, 92, 78, 95],
+  }), []);
 
-    return {
-      currentStatus,
-      upcomingTasks,
-      todayPublished,
-      coursePrompts,
-      addCoursePrompt,
-      removeCoursePrompt,
-      updateSettings,
-      contentItems,
-      metrics,
-      insights,
-      connectedPlatforms,
-      connectPlatform,
-    };
-  }, [
+  const insights: Insight[] = useMemo(() => [
+    {
+      type: "opportunity",
+      title: "Optimal Engagement Window",
+      description: "Your audience demonstrates peak activity between 11 AM - 1 PM. Flâneur recommends concentrating content distribution during this refined timeframe.",
+      action: "Optimize Schedule"
+    },
+    {
+      type: "anomaly",
+      title: "X Platform Performance Shift",
+      description: "X engagement metrics declined 40% this week. Evening content underperforming against historical benchmarks.",
+      action: "Refine Strategy"
+    },
+    {
+      type: "opportunity",
+      title: "Trending Convergence",
+      description: "#AutonomousMarketing aligns with your brand positioning. Flâneur can craft sophisticated content leveraging this momentum.",
+      action: "Generate Content"
+    },
+  ], []);
+
+  return useMemo(() => ({
+    currentStatus,
+    upcomingTasks,
+    todayPublished,
+    coursePrompts,
+    addCoursePrompt,
+    removeCoursePrompt,
+    updateSettings,
+    contentItems,
+    metrics,
+    insights,
+    connectedPlatforms,
+    connectPlatform,
+  }), [
     coursePrompts,
     addCoursePrompt,
     removeCoursePrompt,
     updateSettings,
     connectedPlatforms,
     connectPlatform,
+    upcomingTasks,
+    todayPublished,
+    contentItems,
+    metrics,
+    insights,
   ]);
 });
