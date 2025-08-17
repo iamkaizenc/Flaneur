@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { publicProcedure, protectedProcedure } from "../../create-context";
+import { protectedProcedure } from "../../create-context";
 
 // Plan types and features
 const planFeatures = {
@@ -33,9 +33,21 @@ const upgradeSchema = z.object({
 });
 
 export const plansGetCurrentProcedure = protectedProcedure
-  .query(async () => {
-    // Mock current plan - in real implementation, get from user record
-    const currentPlan: PlanType = "premium";
+  .query(async ({ ctx }) => {
+    // Mock current plan - in real implementation, get from authenticated user
+    // For demo purposes, we'll simulate different plan states
+    const mockUserId = "demo_user"; // In real implementation, get from ctx.user.id
+    
+    // Simulate different users having different plans
+    let currentPlan: PlanType = "free";
+    if (mockUserId.includes("premium")) {
+      currentPlan = "premium";
+    } else if (mockUserId.includes("platinum")) {
+      currentPlan = "platinum";
+    }
+    
+    // For demo, let's default to premium to show features
+    currentPlan = "premium";
     
     return {
       plan: currentPlan,
@@ -43,7 +55,15 @@ export const plansGetCurrentProcedure = protectedProcedure
       allPlans: Object.entries(planFeatures).map(([plan, features]) => ({
         plan: plan as PlanType,
         ...features,
+        price: plan === "premium" ? "$9.99/month" : plan === "platinum" ? "$19.99/month" : "Free",
+        popular: plan === "premium",
       })),
+      subscription: {
+        status: "active",
+        renewalDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(), // 30 days from now
+        cancelAtPeriodEnd: false,
+        trialEndsAt: null,
+      },
     };
   });
 

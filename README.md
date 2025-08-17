@@ -290,6 +290,159 @@ interface Metrics {
 - **Platform Compatibility**: Ensure cross-platform functionality
 - **Accessibility**: Follow WCAG guidelines for inclusive design
 
+## 💳 Plans & Settings Integration
+
+### Subscription Plans
+
+Flâneur offers three tiers designed for different user needs:
+
+#### Free Plan
+- **Features**: Basic queue, manual publish only
+- **Limits**: 1 connected account, 5 daily posts
+- **Analytics**: Disabled
+- **Automation**: Disabled
+- **Price**: Free
+
+#### Premium Plan ($9.99/month)
+- **Features**: Growth tracking + analytics ON, automation OFF
+- **Limits**: 3 connected accounts, 20 daily posts
+- **Analytics**: Enabled (growth charts, insights, anomaly detection)
+- **Automation**: Disabled (manual approval required)
+- **Price**: $9.99/month
+- **Popular**: Most chosen plan
+
+#### Platinum Plan ($19.99/month)
+- **Features**: Analytics + automation ON, unlimited features
+- **Limits**: 10 connected accounts, 100 daily posts
+- **Analytics**: Full analytics suite
+- **Automation**: Full automation (AI publishes without approval)
+- **Price**: $19.99/month
+- **Target**: Power users and agencies
+
+### Settings Screen Features
+
+#### Profile Management
+- **Avatar Upload**: Image picker with base64 encoding
+- **Display Name**: Editable user display name
+- **Email Management**: Update email with password confirmation
+- **Password Change**: Secure password update with validation
+- **Account Deletion**: Permanent account deletion with confirmation
+
+#### Subscription Management
+- **Current Plan Display**: Shows active plan with feature breakdown
+- **Feature Visualization**: Clear indicators for enabled/disabled features
+- **Upgrade Buttons**: Direct upgrade to Premium/Platinum
+- **Purchase Integration**: DRY_RUN mode for testing, LIVE mode for production
+- **Restore Purchases**: iOS/Android purchase restoration
+
+#### Platform Connections
+- **OAuth Integration**: Secure platform linking
+- **Connection Status**: Visual status badges (Connected/Expired)
+- **Account Management**: Connect/disconnect/reconnect flows
+- **Last Refresh**: Timestamp of last token refresh
+
+#### Posting Rules
+- **Daily Limits**: Per-platform posting quotas
+- **Posting Window**: Active hours (default 08:00-22:00)
+- **DRY_RUN Toggle**: Test mode vs live publishing
+- **Rate Limiting**: Automatic rate limit enforcement
+
+#### Content Guardrails
+- **Banned Words**: Configurable word filtering
+- **Risk Levels**: Conservative/Normal/Aggressive content policies
+- **Content Review**: Automatic holding of risky content
+- **Compliance**: Platform ToS adherence
+
+#### Notifications
+- **Email Notifications**: Configurable email alerts
+- **Telegram Integration**: Bot notifications for events
+- **Event Types**: Publish success/error, held content, anomalies
+- **Test Functions**: Send test notifications
+
+### Purchase Integration
+
+#### Development Mode (DRY_RUN)
+```typescript
+// Simulated purchase flow for testing
+const purchaseResult = await purchasePlan("premium");
+// Returns: { success: true, message: "Successfully purchased...", transactionId: "mock_txn_..." }
+```
+
+#### Production Integration
+- **iOS**: App Store In-App Purchases (expo-in-app-purchases)
+- **Android**: Google Play Billing (expo-in-app-purchases)
+- **Web**: Stripe/PayPal integration (future)
+- **Receipt Validation**: Server-side receipt verification
+- **Entitlement Management**: Real-time plan updates
+
+#### Feature Gating
+
+Server-side enforcement ensures plan limits are respected:
+
+```typescript
+// Example: Analytics endpoint requires Premium+
+export const analyticsRoute = requireFeature("analytics")
+  .query(async () => {
+    // This will throw if user is on Free plan
+    return getAnalyticsData();
+  });
+```
+
+### Environment Configuration
+
+```env
+# Purchase Configuration
+DRY_RUN=true                    # Enable test mode
+STRIPE_PUBLISHABLE_KEY=pk_test_... # Web payments
+APPLE_SHARED_SECRET=your_secret    # iOS receipt validation
+GOOGLE_SERVICE_ACCOUNT=path/to/key # Android validation
+
+# Plan Features
+FREE_DAILY_LIMIT=5
+PREMIUM_DAILY_LIMIT=20
+PLATINUM_DAILY_LIMIT=100
+```
+
+### Testing Scenarios
+
+#### Plan Upgrade Flow
+1. User on Free plan sees disabled features
+2. Taps "Upgrade to Premium" button
+3. Purchase flow initiated (DRY_RUN simulates success)
+4. Backend updates user plan
+5. UI refreshes to show enabled features
+6. Analytics tab becomes accessible
+
+#### Feature Gate Validation
+1. Free user attempts to access Growth screen
+2. Server returns feature gate error
+3. UI shows upgrade prompt with plan comparison
+4. User can upgrade directly from error state
+
+#### Purchase Restoration
+1. User reinstalls app or switches devices
+2. Taps "Restore Purchases" in Settings
+3. App queries App Store/Play Store for receipts
+4. Server validates receipts and updates plan
+5. Features are re-enabled based on active subscription
+
+### Common Issues & Solutions
+
+#### Purchase Failures
+- **Network Issues**: Retry with exponential backoff
+- **Invalid Receipts**: Clear cache and retry validation
+- **Plan Sync Issues**: Manual refresh via "Restore Purchases"
+
+#### Feature Gate Errors
+- **Stale Plan Data**: Force refresh user plan from server
+- **Cache Issues**: Clear React Query cache for plan data
+- **Server Sync**: Ensure backend plan matches client state
+
+#### Development Testing
+- **DRY_RUN Mode**: All purchases succeed immediately
+- **Plan Switching**: Manually change mock plan in backend
+- **Feature Testing**: Toggle plan features to test UI states
+
 ## 📄 License
 
 This project is proprietary software. All rights reserved.

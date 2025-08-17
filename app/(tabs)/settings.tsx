@@ -9,8 +9,11 @@ import {
   TextInput,
   Alert,
   Platform,
+  Modal,
+  Image,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import * as ImagePicker from "expo-image-picker";
 import {
   Link,
   Unlink,
@@ -26,9 +29,16 @@ import {
   CheckCircle,
   AlertCircle,
   Send,
+  Camera,
+  Edit3,
+  Trash2,
+  Crown,
+  Star,
+  Zap,
 } from "lucide-react-native";
 import { theme, brandName } from "@/constants/theme";
 import { trpc } from "@/lib/trpc";
+import { usePurchase } from "@/hooks/usePurchase";
 
 interface SectionHeaderProps {
   title: string;
@@ -139,6 +149,12 @@ export default function SettingsScreen() {
   const [dryRunEnabled, setDryRunEnabled] = useState(true);
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [logoEnabled, setLogoEnabled] = useState(true);
+  const [showProfileModal, setShowProfileModal] = useState(false);
+  const [showPasswordModal, setShowPasswordModal] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [profileForm, setProfileForm] = useState({ displayName: "", email: "" });
+  const [passwordForm, setPasswordForm] = useState({ oldPassword: "", newPassword: "", confirmPassword: "" });
+  const [deleteForm, setDeleteForm] = useState({ password: "" });
   
   const settingsQuery = trpc.settings.get.useQuery();
   const settingsUpdateMutation = trpc.settings.update.useMutation();
@@ -148,9 +164,15 @@ export default function SettingsScreen() {
   
   const authMeQuery = trpc.auth.me.useQuery();
   const authLogoutMutation = trpc.auth.logout.useMutation();
+  const authUpdateProfileMutation = trpc.auth.updateProfile.useMutation();
+  const authUpdateEmailMutation = trpc.auth.updateEmail.useMutation();
+  const authUpdatePasswordMutation = trpc.auth.updatePassword.useMutation();
+  const authDeleteAccountMutation = trpc.auth.deleteAccount.useMutation();
   
   const plansQuery = trpc.plans.getCurrent.useQuery();
   const plansUpgradeMutation = trpc.plans.upgrade.useMutation();
+  
+  const { purchasePlan, restorePurchases, isLoading: purchaseLoading } = usePurchase();
 
   const handleConnect = async (platform: string) => {
     try {
@@ -215,15 +237,166 @@ export default function SettingsScreen() {
 
   const handleUpgrade = async (targetPlan: "premium" | "platinum") => {
     try {
-      const result = await plansUpgradeMutation.mutateAsync({ targetPlan });
-      if (result.success) {
-        Alert.alert("Success", result.message);
-        plansQuery.refetch();
+      const purchaseResult = await purchasePlan(targetPlan);
+      if (purchaseResult.success) {
+        const result = await plansUpgradeMutation.mutateAsync({ targetPlan });
+        if (result.success) {
+          Alert.alert("Success", result.message);
+          plansQuery.refetch();
+        }
       } else {
-        Alert.alert("Payment Required", result.message);
+        Alert.alert("Purchase Failed", purchaseResult.message || "Failed to complete purchase");
       }
     } catch (error) {
       Alert.alert("Error", "Failed to upgrade plan");
+    }
+  };
+
+  const handlePickImage = async () => {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== "granted") {
+      Alert.alert("Permission Required", "Please grant camera roll permissions to change your profile picture.");
+      return;
+    }
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.8,
+      base64: true,
+    });
+
+    if (!result.canceled && result.assets[0]) {
+      const asset = result.assets[0];
+      const base64Image = `data:image/jpeg;base64,${asset.base64}`;
+      
+      try {
+        await authUpdateProfileMutation.mutateAsync({ avatarUrl: base64Image });
+        authMeQuery.refetch();
+        Alert.alert("Success", "Profile picture updated successfully");
+      } catch (error) {
+        Alert.alert("Error", "Failed to update profile picture");
+      }
+    }
+  };
+
+  const handleUpdateProfile = async () => {
+    if (!profileForm.displayName.trim()) {
+      Alert.alert("Error", "Display name is required");
+      return;
+    }
+
+    try {
+      await authUpdateProfileMutation.mutateAsync({ displayName: profileForm.displayName });
+      if (profileForm.email !== authMeQuery.data?.email) {
+        await authUpdateEmailMutation.mutateAsync({ 
+          newEmail: profileForm.email, 
+          password: "current_password" // In real app, ask for password
+        });
+      }
+      authMeQuery.refetch();
+      setShowProfileModal(false);
+      Alert.alert("Success", "Profile updated successfully");
+    } catch (error) {
+      Alert.alert("Error", "Failed to update profile");
+    }
+  };
+
+  const handleUpdatePassword = async () => {
+    if (passwordForm.newPassword !== passwordForm.confirmPassword) {
+      Alert.alert("Error", "New passwords do not match");
+      return;
+    }
+
+    if (passwordForm.newPassword.length < 8) {
+      Alert.alert("Error", "Password must be at least 8 characters long");
+      return;
+    }
+
+    try {
+      await authUpdatePasswordMutation.mutateAsync({
+        oldPassword: passwordForm.oldPassword,
+        newPassword: passwordForm.newPassword,
+      });
+      setShowPasswordModal(false);
+      setPasswordForm({ oldPassword: "", newPassword: "", confirmPassword: "" });
+      Alert.alert("Success", "Password updated successfully");
+    } catch (error) {
+      Alert.alert("Error", "Failed to update password. Please check your current password.");
+    }
+  };
+
+  const handleDeleteAccount = async () => {
+    if (!deleteForm.password.trim()) {
+      Alert.alert("Error", "Please enter your password to confirm account deletion");
+      return;
+    }
+
+    Alert.alert(
+      "Delete Account",
+      "This action cannot be undone. All your data will be permanently deleted.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              await authDeleteAccountMutation.mutateAsync({ password: deleteForm.password });
+              setShowDeleteModal(false);
+              Alert.alert("Account Deleted", "Your account has been permanently deleted.");
+              // Navigate to login screen
+            } catch (error) {
+              Alert.alert("Error", "Failed to delete account. Please check your password.");
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const handleRestorePurchases = async () => {
+    try {
+      const result = await restorePurchases();
+      if (result.success) {
+        plansQuery.refetch();
+        Alert.alert("Success", "Purchases restored successfully");
+      } else {
+        Alert.alert("No Purchases", "No previous purchases found to restore");
+      }
+    } catch (error) {
+      Alert.alert("Error", "Failed to restore purchases");
+    }
+  };
+
+  const openProfileModal = () => {
+    setProfileForm({
+      displayName: authMeQuery.data?.displayName || "",
+      email: authMeQuery.data?.email || "",
+    });
+    setShowProfileModal(true);
+  };
+
+  const getPlanIcon = (plan: string) => {
+    switch (plan) {
+      case "premium":
+        return <Star size={16} color="#F59E0B" />;
+      case "platinum":
+        return <Crown size={16} color="#8B5CF6" />;
+      default:
+        return <User size={16} color={theme.colors.gray[400]} />;
+    }
+  };
+
+  const getPlanColor = (plan: string) => {
+    switch (plan) {
+      case "premium":
+        return "#F59E0B";
+      case "platinum":
+        return "#8B5CF6";
+      default:
+        return theme.colors.gray[400];
     }
   };
 
@@ -241,36 +414,134 @@ export default function SettingsScreen() {
         {/* Profile Section */}
         <SectionHeader title="Profile" icon={<User size={20} color={theme.colors.white} />} />
         <View style={styles.section}>
+          <View style={styles.profileCard}>
+            <TouchableOpacity style={styles.avatarContainer} onPress={handlePickImage}>
+              {authMeQuery.data?.avatarUrl ? (
+                <Image source={{ uri: authMeQuery.data.avatarUrl }} style={styles.avatar} />
+              ) : (
+                <View style={styles.avatarPlaceholder}>
+                  <User size={32} color={theme.colors.gray[400]} />
+                </View>
+              )}
+              <View style={styles.avatarOverlay}>
+                <Camera size={16} color={theme.colors.white} />
+              </View>
+            </TouchableOpacity>
+            <View style={styles.profileInfo}>
+              <View style={styles.profileHeader}>
+                <Text style={styles.profileName}>{authMeQuery.data?.displayName || "Loading..."}</Text>
+                <View style={[styles.planBadge, { backgroundColor: getPlanColor(plansQuery.data?.plan || "free") + "20" }]}>
+                  {getPlanIcon(plansQuery.data?.plan || "free")}
+                  <Text style={[styles.planBadgeText, { color: getPlanColor(plansQuery.data?.plan || "free") }]}>
+                    {(plansQuery.data?.plan || "free").toUpperCase()}
+                  </Text>
+                </View>
+              </View>
+              <Text style={styles.profileEmail}>{authMeQuery.data?.email || ""}</Text>
+              <Text style={styles.profileJoined}>
+                Joined {authMeQuery.data?.createdAt ? new Date(authMeQuery.data.createdAt).toLocaleDateString() : ""}
+              </Text>
+            </View>
+          </View>
           <SettingItem
-            title={authMeQuery.data?.displayName || "Loading..."}
-            subtitle={authMeQuery.data?.email || ""}
-            value={`${plansQuery.data?.plan || "free"} plan`}
-            onPress={() => Alert.alert("Profile", "Profile editing not implemented yet")}
+            title="Edit Profile"
+            subtitle="Update your display name and email"
+            onPress={openProfileModal}
+            rightElement={<Edit3 size={16} color={theme.colors.gray[400]} />}
+          />
+          <SettingItem
+            title="Change Password"
+            subtitle="Update your account password"
+            onPress={() => setShowPasswordModal(true)}
+          />
+          <SettingItem
+            title="Delete Account"
+            subtitle="Permanently delete your account and all data"
+            onPress={() => setShowDeleteModal(true)}
+            rightElement={<Trash2 size={16} color="#EF4444" />}
           />
         </View>
 
         {/* Subscription Section */}
         <SectionHeader title="Subscription" icon={<CreditCard size={20} color={theme.colors.white} />} />
         <View style={styles.section}>
-          <SettingItem
-            title="Current Plan"
-            subtitle={plansQuery.data?.featuresEnabled.description || ""}
-            value={plansQuery.data?.plan || "free"}
-          />
+          <View style={styles.currentPlanCard}>
+            <View style={styles.currentPlanHeader}>
+              <View style={styles.currentPlanInfo}>
+                <Text style={styles.currentPlanTitle}>Current Plan</Text>
+                <View style={styles.currentPlanBadge}>
+                  {getPlanIcon(plansQuery.data?.plan || "free")}
+                  <Text style={styles.currentPlanName}>{(plansQuery.data?.plan || "free").toUpperCase()}</Text>
+                </View>
+              </View>
+            </View>
+            <Text style={styles.currentPlanDescription}>
+              {plansQuery.data?.featuresEnabled.description || "Basic features only"}
+            </Text>
+            <View style={styles.planFeatures}>
+              <View style={styles.featureRow}>
+                <CheckCircle size={14} color={plansQuery.data?.featuresEnabled.analytics ? "#10B981" : theme.colors.gray[300]} />
+                <Text style={[styles.featureText, !plansQuery.data?.featuresEnabled.analytics && styles.featureDisabled]}>
+                  Growth Analytics
+                </Text>
+              </View>
+              <View style={styles.featureRow}>
+                <CheckCircle size={14} color={plansQuery.data?.featuresEnabled.automation ? "#10B981" : theme.colors.gray[300]} />
+                <Text style={[styles.featureText, !plansQuery.data?.featuresEnabled.automation && styles.featureDisabled]}>
+                  Automation
+                </Text>
+              </View>
+              <View style={styles.featureRow}>
+                <CheckCircle size={14} color="#10B981" />
+                <Text style={styles.featureText}>
+                  {plansQuery.data?.featuresEnabled.maxAccounts || 1} Connected Accounts
+                </Text>
+              </View>
+              <View style={styles.featureRow}>
+                <CheckCircle size={14} color="#10B981" />
+                <Text style={styles.featureText}>
+                  {plansQuery.data?.featuresEnabled.dailyPosts || 5} Daily Posts
+                </Text>
+              </View>
+            </View>
+          </View>
+          
           {plansQuery.data && plansQuery.data.plan !== "premium" && plansQuery.data.plan !== "platinum" && (
-            <SettingItem
-              title="Upgrade to Premium"
-              subtitle="Growth tracking + analytics"
+            <TouchableOpacity 
+              style={[styles.upgradeButton, styles.premiumButton]} 
               onPress={() => handleUpgrade("premium")}
-            />
+              disabled={purchaseLoading}
+            >
+              <Star size={20} color="#F59E0B" />
+              <View style={styles.upgradeButtonContent}>
+                <Text style={styles.upgradeButtonTitle}>Upgrade to Premium</Text>
+                <Text style={styles.upgradeButtonSubtitle}>Growth tracking + analytics</Text>
+              </View>
+              <ChevronRight size={20} color={theme.colors.gray[400]} />
+            </TouchableOpacity>
           )}
+          
           {plansQuery.data && (plansQuery.data.plan as string) !== "platinum" && (
-            <SettingItem
-              title="Upgrade to Platinum"
-              subtitle="Analytics + automation"
+            <TouchableOpacity 
+              style={[styles.upgradeButton, styles.platinumButton]} 
               onPress={() => handleUpgrade("platinum")}
-            />
+              disabled={purchaseLoading}
+            >
+              <Crown size={20} color="#8B5CF6" />
+              <View style={styles.upgradeButtonContent}>
+                <Text style={styles.upgradeButtonTitle}>Upgrade to Platinum</Text>
+                <Text style={styles.upgradeButtonSubtitle}>Analytics + automation + unlimited</Text>
+              </View>
+              <ChevronRight size={20} color={theme.colors.gray[400]} />
+            </TouchableOpacity>
           )}
+          
+          <SettingItem
+            title="Restore Purchases"
+            subtitle="Restore previous purchases from App Store"
+            onPress={handleRestorePurchases}
+            disabled={purchaseLoading}
+          />
         </View>
 
         {/* Connections Section */}
@@ -418,6 +689,130 @@ export default function SettingsScreen() {
           </TouchableOpacity>
         </View>
       </ScrollView>
+
+      {/* Profile Edit Modal */}
+      <Modal visible={showProfileModal} animationType="slide" presentationStyle="pageSheet">
+        <SafeAreaView style={styles.modalContainer}>
+          <View style={styles.modalHeader}>
+            <TouchableOpacity onPress={() => setShowProfileModal(false)}>
+              <Text style={styles.modalCancel}>Cancel</Text>
+            </TouchableOpacity>
+            <Text style={styles.modalTitle}>Edit Profile</Text>
+            <TouchableOpacity onPress={handleUpdateProfile}>
+              <Text style={styles.modalSave}>Save</Text>
+            </TouchableOpacity>
+          </View>
+          <View style={styles.modalContent}>
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>Display Name</Text>
+              <TextInput
+                style={styles.textInput}
+                value={profileForm.displayName}
+                onChangeText={(text) => setProfileForm({ ...profileForm, displayName: text })}
+                placeholder="Enter your display name"
+                placeholderTextColor={theme.colors.gray[400]}
+              />
+            </View>
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>Email</Text>
+              <TextInput
+                style={styles.textInput}
+                value={profileForm.email}
+                onChangeText={(text) => setProfileForm({ ...profileForm, email: text })}
+                placeholder="Enter your email"
+                placeholderTextColor={theme.colors.gray[400]}
+                keyboardType="email-address"
+                autoCapitalize="none"
+              />
+            </View>
+          </View>
+        </SafeAreaView>
+      </Modal>
+
+      {/* Password Change Modal */}
+      <Modal visible={showPasswordModal} animationType="slide" presentationStyle="pageSheet">
+        <SafeAreaView style={styles.modalContainer}>
+          <View style={styles.modalHeader}>
+            <TouchableOpacity onPress={() => setShowPasswordModal(false)}>
+              <Text style={styles.modalCancel}>Cancel</Text>
+            </TouchableOpacity>
+            <Text style={styles.modalTitle}>Change Password</Text>
+            <TouchableOpacity onPress={handleUpdatePassword}>
+              <Text style={styles.modalSave}>Save</Text>
+            </TouchableOpacity>
+          </View>
+          <View style={styles.modalContent}>
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>Current Password</Text>
+              <TextInput
+                style={styles.textInput}
+                value={passwordForm.oldPassword}
+                onChangeText={(text) => setPasswordForm({ ...passwordForm, oldPassword: text })}
+                placeholder="Enter current password"
+                placeholderTextColor={theme.colors.gray[400]}
+                secureTextEntry
+              />
+            </View>
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>New Password</Text>
+              <TextInput
+                style={styles.textInput}
+                value={passwordForm.newPassword}
+                onChangeText={(text) => setPasswordForm({ ...passwordForm, newPassword: text })}
+                placeholder="Enter new password (min 8 characters)"
+                placeholderTextColor={theme.colors.gray[400]}
+                secureTextEntry
+              />
+            </View>
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>Confirm New Password</Text>
+              <TextInput
+                style={styles.textInput}
+                value={passwordForm.confirmPassword}
+                onChangeText={(text) => setPasswordForm({ ...passwordForm, confirmPassword: text })}
+                placeholder="Confirm new password"
+                placeholderTextColor={theme.colors.gray[400]}
+                secureTextEntry
+              />
+            </View>
+          </View>
+        </SafeAreaView>
+      </Modal>
+
+      {/* Delete Account Modal */}
+      <Modal visible={showDeleteModal} animationType="slide" presentationStyle="pageSheet">
+        <SafeAreaView style={styles.modalContainer}>
+          <View style={styles.modalHeader}>
+            <TouchableOpacity onPress={() => setShowDeleteModal(false)}>
+              <Text style={styles.modalCancel}>Cancel</Text>
+            </TouchableOpacity>
+            <Text style={[styles.modalTitle, { color: "#EF4444" }]}>Delete Account</Text>
+            <TouchableOpacity onPress={handleDeleteAccount}>
+              <Text style={[styles.modalSave, { color: "#EF4444" }]}>Delete</Text>
+            </TouchableOpacity>
+          </View>
+          <View style={styles.modalContent}>
+            <View style={styles.warningBox}>
+              <AlertCircle size={24} color="#EF4444" />
+              <Text style={styles.warningTitle}>This action cannot be undone</Text>
+              <Text style={styles.warningText}>
+                Deleting your account will permanently remove all your data, including content, analytics, and connected accounts.
+              </Text>
+            </View>
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>Enter your password to confirm</Text>
+              <TextInput
+                style={styles.textInput}
+                value={deleteForm.password}
+                onChangeText={(text) => setDeleteForm({ ...deleteForm, password: text })}
+                placeholder="Enter your password"
+                placeholderTextColor={theme.colors.gray[400]}
+                secureTextEntry
+              />
+            </View>
+          </View>
+        </SafeAreaView>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -647,5 +1042,225 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "600" as const,
     color: theme.colors.white,
+  },
+  profileCard: {
+    padding: theme.spacing.lg,
+    flexDirection: "row",
+    alignItems: "center",
+    borderBottomWidth: 1,
+    borderBottomColor: theme.colors.gray[100],
+  },
+  avatarContainer: {
+    position: "relative",
+    marginRight: theme.spacing.md,
+  },
+  avatar: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+  },
+  avatarPlaceholder: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: theme.colors.gray[100],
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  avatarOverlay: {
+    position: "absolute",
+    bottom: 0,
+    right: 0,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: theme.colors.black,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 2,
+    borderColor: theme.colors.white,
+  },
+  profileInfo: {
+    flex: 1,
+  },
+  profileHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 4,
+  },
+  profileName: {
+    fontSize: 18,
+    fontWeight: "600" as const,
+    color: theme.colors.black,
+    flex: 1,
+  },
+  planBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    gap: 4,
+  },
+  planBadgeText: {
+    fontSize: 12,
+    fontWeight: "600" as const,
+  },
+  profileEmail: {
+    fontSize: 14,
+    color: theme.colors.gray[600],
+    marginBottom: 2,
+  },
+  profileJoined: {
+    fontSize: 12,
+    color: theme.colors.gray[400],
+  },
+  currentPlanCard: {
+    padding: theme.spacing.lg,
+    borderBottomWidth: 1,
+    borderBottomColor: theme.colors.gray[100],
+  },
+  currentPlanHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 8,
+  },
+  currentPlanInfo: {
+    flex: 1,
+  },
+  currentPlanTitle: {
+    fontSize: 16,
+    fontWeight: "500" as const,
+    color: theme.colors.black,
+    marginBottom: 4,
+  },
+  currentPlanBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  currentPlanName: {
+    fontSize: 14,
+    fontWeight: "600" as const,
+    color: theme.colors.black,
+  },
+  currentPlanDescription: {
+    fontSize: 14,
+    color: theme.colors.gray[600],
+    marginBottom: 12,
+  },
+  planFeatures: {
+    gap: 8,
+  },
+  featureRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  featureText: {
+    fontSize: 14,
+    color: theme.colors.black,
+  },
+  featureDisabled: {
+    color: theme.colors.gray[400],
+  },
+  upgradeButton: {
+    padding: theme.spacing.md,
+    flexDirection: "row",
+    alignItems: "center",
+    borderBottomWidth: 1,
+    borderBottomColor: theme.colors.gray[100],
+    gap: 12,
+  },
+  premiumButton: {
+    backgroundColor: "#FEF3C7",
+  },
+  platinumButton: {
+    backgroundColor: "#F3E8FF",
+  },
+  upgradeButtonContent: {
+    flex: 1,
+  },
+  upgradeButtonTitle: {
+    fontSize: 16,
+    fontWeight: "600" as const,
+    color: theme.colors.black,
+    marginBottom: 2,
+  },
+  upgradeButtonSubtitle: {
+    fontSize: 14,
+    color: theme.colors.gray[600],
+  },
+  modalContainer: {
+    flex: 1,
+    backgroundColor: theme.colors.white,
+  },
+  modalHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: theme.spacing.md,
+    paddingVertical: theme.spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: theme.colors.gray[200],
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: "600" as const,
+    color: theme.colors.black,
+  },
+  modalCancel: {
+    fontSize: 16,
+    color: theme.colors.gray[600],
+  },
+  modalSave: {
+    fontSize: 16,
+    fontWeight: "600" as const,
+    color: theme.colors.black,
+  },
+  modalContent: {
+    flex: 1,
+    padding: theme.spacing.md,
+  },
+  inputGroup: {
+    marginBottom: theme.spacing.lg,
+  },
+  inputLabel: {
+    fontSize: 16,
+    fontWeight: "500" as const,
+    color: theme.colors.black,
+    marginBottom: 8,
+  },
+  textInput: {
+    borderWidth: 1,
+    borderColor: theme.colors.gray[300],
+    borderRadius: theme.borderRadius.md,
+    paddingHorizontal: theme.spacing.md,
+    paddingVertical: 12,
+    fontSize: 16,
+    color: theme.colors.black,
+    backgroundColor: theme.colors.white,
+  },
+  warningBox: {
+    backgroundColor: "#FEF2F2",
+    padding: theme.spacing.md,
+    borderRadius: theme.borderRadius.md,
+    alignItems: "center",
+    marginBottom: theme.spacing.lg,
+  },
+  warningTitle: {
+    fontSize: 16,
+    fontWeight: "600" as const,
+    color: "#EF4444",
+    marginTop: 8,
+    marginBottom: 4,
+  },
+  warningText: {
+    fontSize: 14,
+    color: "#7F1D1D",
+    textAlign: "center",
+    lineHeight: 20,
   },
 });
