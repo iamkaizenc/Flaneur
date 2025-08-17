@@ -1,6 +1,6 @@
 import { createTRPCRouter } from "./create-context";
 import hiRoute from "./routes/example/hi/route";
-import { oauthStartProcedure, oauthCallbackProcedure } from "./routes/oauth/route";
+import { oauthStartProcedure, oauthCallbackProcedure, getConnectedAccountsProcedure, disconnectAccountProcedure } from "./routes/oauth/route";
 import { contentListProcedure, contentQueueProcedure, contentHoldProcedure, contentRetryProcedure } from "./routes/content/list/route";
 import { insightsListProcedure } from "./routes/insights/list/route";
 import { settingsGetProcedure, settingsUpdateProcedure, settingsConnectProcedure, settingsDisconnectProcedure, settingsTestNotificationProcedure } from "./routes/settings/route";
@@ -14,6 +14,8 @@ export const appRouter = createTRPCRouter({
   oauth: createTRPCRouter({
     start: oauthStartProcedure,
     callback: oauthCallbackProcedure,
+    getConnectedAccounts: getConnectedAccountsProcedure,
+    disconnect: disconnectAccountProcedure,
   }),
   content: createTRPCRouter({
     list: contentListProcedure,
