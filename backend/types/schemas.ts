@@ -22,6 +22,27 @@ export const ContentStatusSchema = z.enum([
   "error"
 ]);
 
+// Platform limits info schema
+export const PlatformLimitsInfoSchema = z.union([
+  z.object({
+    textLength: z.number(),
+    maxLength: z.number(),
+    hasMedia: z.boolean()
+  }),
+  z.object({
+    guardrailTriggered: z.boolean(),
+    reason: z.string(),
+    riskLevel: z.string()
+  }),
+  z.object({
+    publishAttempts: z.number(),
+    lastError: z.string(),
+    errorMessage: z.string()
+  })
+]);
+
+export type PlatformLimitsInfo = z.infer<typeof PlatformLimitsInfoSchema>;
+
 export type ContentStatus = z.infer<typeof ContentStatusSchema>;
 
 // Social account schema

@@ -23,38 +23,17 @@ The following logo assets have been generated and are ready for download:
 - **Background**: Create solid black background (#000000)
 - **Save as**: `assets/brand/flaneur-adaptive-foreground.png` and `assets/brand/flaneur-adaptive-background.png`
 
-## Required app.json Updates
+## App Configuration Snippet
 
-Update your `app.json` file with the following changes:
+Add this configuration to your app.json expo section:
 
-```json
-{
-  "expo": {
-    "name": "Flâneur",
-    "slug": "flaneur-autonomous-social-media",
-    "icon": "./assets/brand/flaneur-icon-ios-1024.png",
-    "splash": {
-      "image": "./assets/brand/flaneur-logo-white.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#000000"
-    },
-    "ios": {
-      "supportsTablet": true,
-      "bundleIdentifier": "com.flaneur.app"
-    },
-    "android": {
-      "adaptiveIcon": {
-        "foregroundImage": "./assets/brand/flaneur-adaptive-foreground.png",
-        "backgroundImage": "./assets/brand/flaneur-adaptive-background.png"
-      },
-      "package": "com.flaneur.app"
-    },
-    "web": {
-      "favicon": "./assets/brand/flaneur-logo-white.png"
-    }
-  }
-}
-```
+name=Flaneur
+slug=flaneur
+icon=./assets/brand/flaneur-icon-ios-1024.png
+splash image=./assets/brand/flaneur-logo-white.png, resizeMode=contain, backgroundColor=#000000
+android adaptiveIcon foregroundImage=./assets/brand/flaneur-adaptive-foreground.png, backgroundImage=./assets/brand/flaneur-adaptive-background.png
+ios supportsTablet=true
+assetBundlePatterns=["**/*"]
 
 ## Installation Steps
 
@@ -79,7 +58,14 @@ Update your `app.json` file with the following changes:
 
 4. **Clear Expo cache and rebuild**:
    ```bash
-   expo r -c
+   npx expo prebuild --clean
+   bun run dev
+   ```
+
+5. **Production Build Verification**:
+   ```bash
+   bun run typecheck
+   bun run build
    ```
 
 ## Logo Component Usage

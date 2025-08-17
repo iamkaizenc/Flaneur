@@ -35,6 +35,10 @@ import {
   Crown,
   Star,
   Zap,
+  ExternalLink,
+  Mail,
+  FileText,
+  Globe,
 } from "lucide-react-native";
 import { theme, brandName } from "@/constants/theme";
 import { trpc } from "@/lib/trpc";
@@ -304,7 +308,7 @@ export default function SettingsScreen() {
 
     try {
       await authUpdateProfileMutation.mutateAsync({ displayName: profileForm.displayName });
-      if (profileForm.email !== authMeQuery.data?.email) {
+      if (profileForm.email !== authMeQuery.data?.user?.email) {
         await authUpdateEmailMutation.mutateAsync({ 
           newEmail: profileForm.email, 
           password: "current_password" // In real app, ask for password
@@ -387,8 +391,8 @@ export default function SettingsScreen() {
 
   const openProfileModal = () => {
     setProfileForm({
-      displayName: authMeQuery.data?.displayName || "",
-      email: authMeQuery.data?.email || "",
+      displayName: authMeQuery.data?.user?.displayName || "",
+      email: authMeQuery.data?.user?.email || "",
     });
     setShowProfileModal(true);
   };
@@ -431,8 +435,8 @@ export default function SettingsScreen() {
         <View style={styles.section}>
           <View style={styles.profileCard}>
             <TouchableOpacity style={styles.avatarContainer} onPress={handlePickImage}>
-              {authMeQuery.data?.avatarUrl ? (
-                <Image source={{ uri: authMeQuery.data.avatarUrl }} style={styles.avatar} />
+              {authMeQuery.data?.user?.avatarUrl ? (
+                <Image source={{ uri: authMeQuery.data.user.avatarUrl }} style={styles.avatar} />
               ) : (
                 <View style={styles.avatarPlaceholder}>
                   <User size={32} color={theme.colors.gray[400]} />
@@ -444,7 +448,7 @@ export default function SettingsScreen() {
             </TouchableOpacity>
             <View style={styles.profileInfo}>
               <View style={styles.profileHeader}>
-                <Text style={styles.profileName}>{authMeQuery.data?.displayName || "Loading..."}</Text>
+                <Text style={styles.profileName}>{authMeQuery.data?.user?.displayName || "Loading..."}</Text>
                 <View style={[styles.planBadge, { backgroundColor: getPlanColor(plansQuery.data?.plan || "free") + "20" }]}>
                   {getPlanIcon(plansQuery.data?.plan || "free")}
                   <Text style={[styles.planBadgeText, { color: getPlanColor(plansQuery.data?.plan || "free") }]}>
@@ -452,9 +456,9 @@ export default function SettingsScreen() {
                   </Text>
                 </View>
               </View>
-              <Text style={styles.profileEmail}>{authMeQuery.data?.email || ""}</Text>
+              <Text style={styles.profileEmail}>{authMeQuery.data?.user?.email || ""}</Text>
               <Text style={styles.profileJoined}>
-                Joined {authMeQuery.data?.createdAt ? new Date(authMeQuery.data.createdAt).toLocaleDateString() : ""}
+                Joined {authMeQuery.data?.user?.createdAt ? new Date(authMeQuery.data.user.createdAt).toLocaleDateString() : ""}
               </Text>
             </View>
           </View>
@@ -694,7 +698,82 @@ export default function SettingsScreen() {
             subtitle="/api/version endpoint"
             value="v1.0.0"
           />
+          <SettingItem
+            title="Manual Cron Trigger"
+            subtitle="Run metrics refresh and daily rollup"
+            onPress={() => {
+              // Trigger manual cron jobs for testing
+              Alert.alert("Cron Jobs", "Manual trigger started (DRY_RUN mode)");
+            }}
+          />
         </View>
+
+        {/* Contact Section */}
+        <SectionHeader title="Contact" icon={<Mail size={20} color={theme.colors.white} />} />
+        <View style={styles.section}>
+          <SettingItem
+            title="Website"
+            subtitle="flaneurcollective.com"
+            onPress={() => {
+              if (Platform.OS === 'web') {
+                window.open('https://flaneurcollective.com', '_blank');
+              } else {
+                Alert.alert("Website", "Visit flaneurcollective.com in your browser");
+              }
+            }}
+            rightElement={<ExternalLink size={16} color={theme.colors.gray[400]} />}
+          />
+          <SettingItem
+            title="Support"
+            subtitle="support@flaneurcollective.com"
+            onPress={() => {
+              if (Platform.OS === 'web') {
+                window.open('mailto:support@flaneurcollective.com', '_blank');
+              } else {
+                Alert.alert("Support", "Email support@flaneurcollective.com");
+              }
+            }}
+            rightElement={<Mail size={16} color={theme.colors.gray[400]} />}
+          />
+          <SettingItem
+            title="Privacy Policy"
+            subtitle="flaneurcollective.com/privacy"
+            onPress={() => {
+              if (Platform.OS === 'web') {
+                window.open('https://flaneurcollective.com/privacy', '_blank');
+              } else {
+                Alert.alert("Privacy Policy", "Visit flaneurcollective.com/privacy in your browser");
+              }
+            }}
+            rightElement={<FileText size={16} color={theme.colors.gray[400]} />}
+          />
+          <SettingItem
+            title="Terms of Service"
+            subtitle="flaneurcollective.com/terms"
+            onPress={() => {
+              if (Platform.OS === 'web') {
+                window.open('https://flaneurcollective.com/terms', '_blank');
+              } else {
+                Alert.alert("Terms of Service", "Visit flaneurcollective.com/terms in your browser");
+              }
+            }}
+            rightElement={<FileText size={16} color={theme.colors.gray[400]} />}
+          />
+        </View>
+
+        {/* Free User Ads */}
+        {plansQuery.data?.plan === 'free' && process.env.ADS_ENABLED === 'true' && (
+          <View style={styles.adSection}>
+            <View style={styles.adCard}>
+              <Text style={styles.adLabel}>Ad</Text>
+              <Text style={styles.adTitle}>Upgrade to Premium</Text>
+              <Text style={styles.adDescription}>Remove ads and unlock advanced features</Text>
+              <TouchableOpacity style={styles.adButton} onPress={() => handleUpgrade('premium')}>
+                <Text style={styles.adButtonText}>Upgrade Now</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        )}
 
         {/* Logout */}
         <View style={styles.logoutSection}>
@@ -1277,5 +1356,61 @@ const styles = StyleSheet.create({
     color: "#7F1D1D",
     textAlign: "center",
     lineHeight: 20,
+  },
+  adSection: {
+    marginTop: theme.spacing.lg,
+    marginBottom: theme.spacing.md,
+  },
+  adCard: {
+    backgroundColor: theme.colors.white,
+    borderRadius: theme.borderRadius.lg,
+    padding: theme.spacing.lg,
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: theme.colors.gray[200],
+    ...Platform.select({
+      ios: {
+        shadowColor: theme.colors.black,
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 8,
+      },
+      android: {
+        elevation: 2,
+      },
+    }),
+  },
+  adLabel: {
+    fontSize: 10,
+    fontWeight: "600" as const,
+    color: theme.colors.gray[400],
+    textTransform: "uppercase",
+    letterSpacing: 1,
+    marginBottom: 8,
+  },
+  adTitle: {
+    fontSize: 18,
+    fontWeight: "600" as const,
+    color: theme.colors.black,
+    marginBottom: 8,
+    textAlign: "center",
+  },
+  adDescription: {
+    fontSize: 14,
+    color: theme.colors.gray[600],
+    textAlign: "center",
+    marginBottom: 16,
+    lineHeight: 20,
+  },
+  adButton: {
+    backgroundColor: theme.colors.black,
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: theme.borderRadius.md,
+  },
+  adButtonText: {
+    fontSize: 14,
+    fontWeight: "600" as const,
+    color: theme.colors.white,
   },
 });

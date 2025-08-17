@@ -57,7 +57,7 @@ Experience the complete Flâneur workflow in just 5 minutes:
 ## 🚀 Quick Start
 
 ### Prerequisites
-- Node.js 18+ and npm/yarn
+- Node.js 18+ and bun/npm/yarn
 - Expo CLI: `npm install -g @expo/cli`
 - iOS Simulator or Android Emulator (optional)
 
@@ -67,7 +67,7 @@ Experience the complete Flâneur workflow in just 5 minutes:
    ```bash
    git clone <repository-url>
    cd flaneur
-   npm install
+   bun install
    ```
 
 2. **Environment Setup**
@@ -78,13 +78,25 @@ Experience the complete Flâneur workflow in just 5 minutes:
 
 3. **Start Development**
    ```bash
-   npm run dev
+   bun run dev
    ```
 
 4. **Open the App**
    - Web: Opens automatically in browser
    - Mobile: Scan QR code with Expo Go app
    - Simulator: Press `i` for iOS or `a` for Android
+
+### Available Scripts
+```bash
+bun run dev          # Start development server
+bun run ios          # Run on iOS simulator
+bun run android      # Run on Android emulator
+bun run web          # Run on web browser
+bun run typecheck    # Run TypeScript type checking
+bun run build        # Build for production
+bun run test         # Run test suite
+bun run seed         # Seed development data
+```
 
 ## 🏗️ Architecture
 
@@ -127,6 +139,22 @@ Experience the complete Flâneur workflow in just 5 minutes:
 5. Auto-refresh tokens when needed
 6. Graceful handling of expired/revoked tokens
 
+### DRY_RUN vs LIVE Mode
+
+**DRY_RUN=true (Development/Demo)**
+- All API calls simulated
+- Mock data generation
+- Safe testing environment
+- Full feature demonstration
+- No real social media posting
+
+**DRY_RUN=false (Production)**
+- Real API calls to social platforms
+- Actual content publishing
+- Live metrics and analytics
+- Production error handling
+- Rate limiting enforcement
+
 ## 🔧 Configuration
 
 ### Environment Variables
@@ -162,12 +190,25 @@ JWT_SECRET=your_jwt_secret
 
 ### Scripts
 ```bash
-npm run dev          # Start development server
-npm run build        # Build for production  
-npm run test         # Run test suite
-npm run typecheck    # TypeScript validation
-npm run lint         # ESLint checking
+bun run dev          # Start development server
+bun run build        # Build for production  
+bun run test         # Run test suite
+bun run typecheck    # TypeScript validation
+bun run seed         # Seed development data
 ```
+
+### Cron Jobs & Background Tasks
+
+**Automated Schedules**
+- **30-minute**: Metrics refresh from connected platforms
+- **24-hour**: Daily rollup and anomaly detection
+- **Manual Trigger**: `/api/trpc/crons.triggerAll` for development
+
+**Idempotency & Retry Logic**
+- Unique keys prevent duplicate posts
+- Exponential backoff for failed operations
+- Comprehensive trace logging
+- Automatic retry for transient failures
 
 ### Project Structure
 ```
@@ -215,6 +256,26 @@ npm run lint         # ESLint checking
    };
    ```
 
+### Timezone Handling
+
+**Posting Windows**
+- User sets local timezone preferences
+- Server converts to UTC for enforcement
+- Optimal posting times per platform
+- Automatic DST adjustments (production)
+
+**Implementation**
+```typescript
+// Get user's posting window
+const window = await trpc.timezones.getPostingWindow.query({ timezone: 'America/New_York' });
+
+// Check if time is within window
+const isValid = await trpc.timezones.isWithinWindow.query({ 
+  scheduledAt: '2024-01-15T14:00:00Z',
+  timezone: 'America/New_York'
+});
+```
+
 ## 🔒 Security
 
 ### Data Protection
@@ -237,29 +298,82 @@ npm run lint         # ESLint checking
 - **Usage Tracking**: API quotas, rate limits, errors
 - **Plan Enforcement**: Feature usage monitoring
 
-### Logging
-- **Structured Logging**: JSON format with correlation IDs
-- **Error Tracking**: Typed errors with context
-- **Performance**: Request timing and optimization
-- **Audit Trail**: All user actions and system events
+### Trace Logging System
+```typescript
+// View content publishing trail
+const logs = await trpc.traces.get.query({ contentId: '123' });
+// Returns: queued → publishing → published/held/failed
+
+// System-wide logs for debugging
+const systemLogs = await trpc.traces.system.query({ 
+  status: 'failed', 
+  limit: 50 
+});
+```
+
+### Insights & Anomaly Detection
+- **Moving Averages**: 7-day baseline calculation
+- **3-Sigma Rule**: Statistical outlier detection
+- **Percentage Changes**: Performance vs previous period
+- **Actionable Recommendations**: Specific improvement suggestions
+- **Confidence Scores**: AI prediction reliability
+
+### Free User Ad System
+**Placement Strategy**
+- Settings footer card
+- Growth chart under-banner
+- Content list (every 10th item)
+- Modal interstitials
+
+**DRY_RUN Ads**
+- Labeled "Ad" for transparency
+- No tracking in development
+- Disabled for Premium/Platinum
+- Environment controlled (`ADS_ENABLED=true`)
 
 ## 🚢 Deployment
 
 ### Development
 ```bash
-npm run dev  # Local development with hot reload
+bun run dev  # Local development with hot reload
 ```
 
 ### Production Build
 ```bash
-npm run build     # Build optimized bundle
-npm run preview   # Test production build locally
+bun run build     # Build optimized bundle
+bun run typecheck # Validate TypeScript
 ```
 
 ### Platform Deployment
 - **Web**: Static hosting (Vercel, Netlify)
 - **Mobile**: Expo Application Services (EAS)
 - **Backend**: Node.js hosting (Railway, Render)
+
+### IAP Sandbox Testing
+
+**TestFlight Setup**
+1. Enable Sandbox environment in App Store Connect
+2. Create test user accounts in Sandbox
+3. Set `IAP_DRY_RUN=true` for testing without real charges
+4. Test purchase flow: Free → Premium → Platinum
+5. Test restore purchases functionality
+6. Verify plan features are properly gated
+
+**Subscription Testing Matrix**
+```bash
+# Test all plan transitions
+Free → Premium: Analytics enabled, automation disabled
+Premium → Platinum: Automation enabled, unlimited accounts
+Platinum → Free: All features disabled, ads shown
+Restore: Previous plan restored from App Store receipt
+```
+
+**Settings Subscription UI**
+- Current plan with feature list
+- Upgrade buttons (contextual)
+- Restore purchases option
+- Renewal info and manage subscription link
+- Small "Sandbox" badge when `IAP_DRY_RUN=true`
 
 ## 🤝 Contributing
 
@@ -280,7 +394,7 @@ npm run preview   # Test production build locally
 
 ## 📄 License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+This project is proprietary software. All rights reserved.
 
 ## 🆘 Support
 
@@ -302,9 +416,40 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - Check console for error messages
 
 ### Getting Help
-- **Documentation**: Check README and code comments
-- **Issues**: Create GitHub issue with reproduction steps
-- **Discussions**: Use GitHub Discussions for questions
+- **Website**: [flaneurcollective.com](https://flaneurcollective.com)
+- **Support Email**: support@flaneurcollective.com
+- **Privacy Policy**: [flaneurcollective.com/privacy](https://flaneurcollective.com/privacy)
+- **Terms of Service**: [flaneurcollective.com/terms](https://flaneurcollective.com/terms)
+
+### Account Linking Steps
+1. **X (Twitter)**: OAuth 2.0 → Developer Portal → Callback URL
+2. **LinkedIn**: Company Pages API → OAuth consent
+3. **Instagram**: Meta Business → Graph API permissions
+4. **Telegram**: BotFather → Create bot → Get token
+5. **TikTok**: Business API → Developer account
+6. **Facebook**: Meta for Developers → App creation
+
+### Common Errors & Solutions
+
+**"Rate limit exceeded"**
+- Check daily quotas in Settings
+- Wait for rate limit reset
+- Verify posting window compliance
+
+**"Token expired"**
+- Use "Fix" button in Connections
+- Re-authenticate with platform
+- Check token refresh settings
+
+**"Content held by guardrail"**
+- Review banned words list
+- Adjust risk level settings
+- Edit content and requeue
+
+**"Publishing window closed"**
+- Check timezone settings
+- Verify posting hours (8 AM - 10 PM default)
+- Schedule for next available window
 
 ---
 
