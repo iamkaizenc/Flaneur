@@ -19,7 +19,7 @@ export const ContentStatusSchema = z.enum([
   "publishing",
   "published",
   "held",
-  "failed"
+  "error"
 ]);
 
 export type ContentStatus = z.infer<typeof ContentStatusSchema>;
@@ -131,7 +131,9 @@ export type Insight = z.infer<typeof InsightSchema>;
 export const UserSchema = z.object({
   id: z.string(),
   email: z.string().email(),
-  plan: z.enum(["free", "pro", "enterprise"]).default("free"),
+  displayName: z.string().optional(),
+  avatarUrl: z.string().optional(),
+  plan: z.enum(["free", "premium", "platinum"]).default("free"),
   createdAt: z.date(),
   updatedAt: z.date(),
 });

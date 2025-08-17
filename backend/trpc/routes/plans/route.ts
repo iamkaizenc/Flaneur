@@ -1,116 +1,227 @@
 import { z } from "zod";
-import { protectedProcedure } from "../../create-context";
+import { publicProcedure } from "../../create-context";
+// Error classes
+class ValidationError extends Error {
+  constructor(message: string, public field?: string) {
+    super(message);
+    this.name = "ValidationError";
+  }
+}
 
-// Plan types and features
-const planFeatures = {
-  free: {
-    analytics: false,
-    automation: false,
-    maxAccounts: 1,
-    dailyPosts: 5,
-    description: "Basic queue, manual publish only",
-  },
-  premium: {
-    analytics: true,
-    automation: false,
-    maxAccounts: 3,
-    dailyPosts: 20,
-    description: "Growth tracking + analytics ON, automation OFF",
-  },
-  platinum: {
-    analytics: true,
-    automation: true,
-    maxAccounts: 10,
-    dailyPosts: 100,
-    description: "Analytics + automation ON, unlimited features",
-  },
-} as const;
-
-type PlanType = keyof typeof planFeatures;
-
-const upgradeSchema = z.object({
-  targetPlan: z.enum(["premium", "platinum"]),
+const plansUpgradeInputSchema = z.object({
+  targetPlan: z.enum(["premium", "platinum"])
 });
 
-export const plansGetCurrentProcedure = protectedProcedure
-  .query(async ({ ctx }) => {
-    // Mock current plan - in real implementation, get from authenticated user
-    // For demo purposes, we'll simulate different plan states
-    const mockUserId = "demo_user"; // In real implementation, get from ctx.user.id
-    
-    // Simulate different users having different plans
-    let currentPlan: PlanType = "free";
-    if (mockUserId.includes("premium")) {
-      currentPlan = "premium";
-    } else if (mockUserId.includes("platinum")) {
-      currentPlan = "platinum";
+// Plan definitions with feature flags
+const planDefinitions = {
+  free: {
+    name: "Free",
+    description: "Basic features only",
+    price: 0,
+    features: {
+      analytics: false,
+      automation: false,
+      maxAccounts: 1,
+      dailyPosts: 5,
+      aiAgent: false,
+      prioritySupport: false
     }
+  },
+  premium: {
+    name: "Premium",
+    description: "Growth tracking + analytics",
+    price: 29,
+    features: {
+      analytics: true,
+      automation: false,
+      maxAccounts: 3,
+      dailyPosts: 20,
+      aiAgent: true, // Limited to idea and brief only
+      prioritySupport: false
+    }
+  },
+  platinum: {
+    name: "Platinum",
+    description: "Analytics + automation + unlimited",
+    price: 99,
+    features: {
+      analytics: true,
+      automation: true,
+      maxAccounts: 10,
+      dailyPosts: 100,
+      aiAgent: true, // Full access including apply
+      prioritySupport: true
+    }
+  }
+};
+
+// Mock current user plan (this would come from auth context in real app)
+let mockUserPlan = "platinum" as keyof typeof planDefinitions;
+
+export const plansGetCurrentProcedure = publicProcedure
+  .query(async () => {
+    console.log("[Plans] Fetching current plan and features");
     
-    // For demo, let's default to premium to show features
-    currentPlan = "premium";
+    const currentPlan = planDefinitions[mockUserPlan];
     
     return {
-      plan: currentPlan,
-      featuresEnabled: planFeatures[currentPlan],
-      allPlans: Object.entries(planFeatures).map(([plan, features]) => ({
-        plan: plan as PlanType,
-        ...features,
-        price: plan === "premium" ? "$9.99/month" : plan === "platinum" ? "$19.99/month" : "Free",
-        popular: plan === "premium",
-      })),
-      subscription: {
-        status: "active",
-        renewalDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(), // 30 days from now
-        cancelAtPeriodEnd: false,
-        trialEndsAt: null,
+      success: true,
+      plan: mockUserPlan,
+      ...currentPlan,
+      featuresEnabled: {
+        ...currentPlan.features,
+        description: currentPlan.description
       },
+      billingCycle: "monthly",
+      nextBillingDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+      cancelAtPeriodEnd: false
     };
   });
 
-export const plansUpgradeProcedure = protectedProcedure
-  .input(upgradeSchema)
-  .mutation(async ({ input }: { input: z.infer<typeof upgradeSchema> }) => {
-    // Mock upgrade - in real implementation, integrate with payment provider
-    console.log("Upgrading to plan:", input.targetPlan);
+export const plansListProcedure = publicProcedure
+  .query(async () => {
+    console.log("[Plans] Fetching all available plans");
     
-    // For DRY_RUN mode, immediately update user plan
-    const isDryRun = process.env.DRY_RUN === "true";
+    return {
+      success: true,
+      plans: Object.entries(planDefinitions).map(([key, plan]) => ({
+        id: key,
+        ...plan,
+        current: key === mockUserPlan
+      }))
+    };
+  });
+
+export const plansUpgradeProcedure = publicProcedure
+  .input(plansUpgradeInputSchema)
+  .mutation(async ({ input }) => {
+    console.log(`[Plans] Upgrading to ${input.targetPlan}`);
+    
+    const isDryRun = process.env.DRY_RUN === "true" || process.env.DRY_RUN === "1";
     
     if (isDryRun) {
+      console.log(`[Plans] DRY_RUN mode - simulating upgrade to ${input.targetPlan}`);
+      
+      // Validate upgrade path
+      const currentPlanOrder = { free: 0, premium: 1, platinum: 2 };
+      const targetPlanOrder = currentPlanOrder[input.targetPlan];
+      const currentOrder = currentPlanOrder[mockUserPlan];
+      
+      if (targetPlanOrder <= currentOrder) {
+        throw new ValidationError(`Cannot downgrade from ${mockUserPlan} to ${input.targetPlan}`);
+      }
+      
+      // Simulate successful upgrade
+      mockUserPlan = input.targetPlan;
+      
+      const newPlan = planDefinitions[input.targetPlan];
+      
       return {
         success: true,
-        message: `Successfully upgraded to ${input.targetPlan} plan (DRY_RUN mode)`,
-        newPlan: input.targetPlan,
-        featuresEnabled: planFeatures[input.targetPlan],
-        upgradedAt: new Date().toISOString(),
-      };
-    } else {
-      // In LIVE mode, this would redirect to payment provider
-      return {
-        success: false,
-        message: "Payment integration not implemented yet",
-        paymentUrl: `https://payment-provider.com/checkout?plan=${input.targetPlan}`,
+        message: `Successfully upgraded to ${newPlan.name} (DRY_RUN mode)`,
+        plan: input.targetPlan,
+        features: newPlan.features,
+        nextBillingDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
       };
     }
+    
+    // In LIVE mode, this would:
+    // 1. Validate purchase receipt from IAP
+    // 2. Update user plan in database
+    // 3. Enable/disable features based on plan
+    // 4. Set up billing cycle
+    
+    throw new Error("LIVE plan upgrade not implemented - set DRY_RUN=true for demo mode");
   });
 
-// Server-side feature gate helper
-export const checkFeatureAccess = (userPlan: PlanType, feature: keyof typeof planFeatures.platinum) => {
-  return planFeatures[userPlan][feature] === true;
+export const plansDowngradeProcedure = publicProcedure
+  .input(z.object({ targetPlan: z.enum(["free", "premium"]) }))
+  .mutation(async ({ input }) => {
+    console.log(`[Plans] Downgrading to ${input.targetPlan}`);
+    
+    const isDryRun = process.env.DRY_RUN === "true" || process.env.DRY_RUN === "1";
+    
+    if (isDryRun) {
+      console.log(`[Plans] DRY_RUN mode - simulating downgrade to ${input.targetPlan}`);
+      
+      // Validate downgrade path
+      const currentPlanOrder = { free: 0, premium: 1, platinum: 2 };
+      const targetPlanOrder = currentPlanOrder[input.targetPlan];
+      const currentOrder = currentPlanOrder[mockUserPlan];
+      
+      if (targetPlanOrder >= currentOrder) {
+        throw new ValidationError(`Cannot upgrade from ${mockUserPlan} to ${input.targetPlan} using downgrade`);
+      }
+      
+      // Simulate successful downgrade
+      mockUserPlan = input.targetPlan;
+      
+      const newPlan = planDefinitions[input.targetPlan];
+      
+      return {
+        success: true,
+        message: `Successfully downgraded to ${newPlan.name} (DRY_RUN mode)`,
+        plan: input.targetPlan,
+        features: newPlan.features,
+        effectiveDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString() // End of current billing cycle
+      };
+    }
+    
+    throw new Error("LIVE plan downgrade not implemented - set DRY_RUN=true for demo mode");
+  });
+
+export const plansGetUsageProcedure = publicProcedure
+  .query(async () => {
+    console.log("[Plans] Fetching current usage statistics");
+    
+    const currentPlan = planDefinitions[mockUserPlan];
+    
+    // Mock usage data
+    const usage = {
+      accounts: {
+        used: 2,
+        limit: currentPlan.features.maxAccounts,
+        remaining: currentPlan.features.maxAccounts - 2
+      },
+      dailyPosts: {
+        used: 8,
+        limit: currentPlan.features.dailyPosts,
+        remaining: currentPlan.features.dailyPosts - 8,
+        resetTime: new Date(Date.now() + 16 * 60 * 60 * 1000).toISOString() // 16 hours from now (midnight)
+      },
+      analytics: {
+        enabled: currentPlan.features.analytics,
+        dataRetention: currentPlan.features.analytics ? "90 days" : "7 days"
+      },
+      automation: {
+        enabled: currentPlan.features.automation,
+        activeRules: currentPlan.features.automation ? 3 : 0
+      }
+    };
+    
+    return {
+      success: true,
+      plan: mockUserPlan,
+      usage,
+      billingPeriod: {
+        start: new Date(Date.now() - 15 * 24 * 60 * 60 * 1000).toISOString(),
+        end: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000).toISOString()
+      }
+    };
+  });
+
+// Server-side feature gating helper
+export const checkFeatureAccess = (feature: keyof typeof planDefinitions.free.features): boolean => {
+  const currentPlan = planDefinitions[mockUserPlan];
+  return Boolean(currentPlan.features[feature]);
 };
 
-// Feature gate middleware for tRPC procedures
-export const requireFeature = (feature: keyof typeof planFeatures.platinum) => {
-  return protectedProcedure.use(async ({ ctx, next }) => {
-    // Mock user plan - in real implementation, get from authenticated user
-    const userPlan: PlanType = "premium";
-    
-    if (!checkFeatureAccess(userPlan, feature)) {
-      throw new Error(`Feature '${feature}' requires ${
-        feature === "analytics" ? "Premium" : "Platinum"
-      } plan or higher`);
+// Middleware for feature gating (would be used in other procedures)
+export const requireFeature = (feature: keyof typeof planDefinitions.free.features) => {
+  return (req: any, res: any, next: any) => {
+    if (!checkFeatureAccess(feature)) {
+      throw new ValidationError(`Feature '${feature}' requires ${feature === 'analytics' ? 'Premium' : 'Platinum'} plan`);
     }
-    
-    return next({ ctx });
-  });
+    next();
+  };
 };

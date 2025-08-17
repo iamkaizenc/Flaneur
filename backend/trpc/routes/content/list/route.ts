@@ -3,7 +3,7 @@ import { publicProcedure } from "../../../create-context";
 
 const contentListInputSchema = z.object({
   limit: z.number().min(1).max(100).default(20),
-  status: z.enum(["draft", "queued", "published", "held", "error"]).optional(),
+  status: z.enum(["draft", "queued", "publishing", "published", "held", "error"]).optional(),
   platform: z.string().optional(),
 });
 
@@ -13,7 +13,7 @@ const mockContent = [
     id: "1",
     title: "The Art of Autonomous Marketing",
     body: "Discover how Flâneur transforms social media strategy through intelligent automation and sophisticated content curation.",
-    platform: "linkedin",
+    platform: "linkedin" as const,
     status: "published" as const,
     scheduledAt: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
     publishedAt: new Date(Date.now() - 60 * 60 * 1000).toISOString(),
@@ -36,7 +36,7 @@ const mockContent = [
     id: "2",
     title: "Minimalist Content Strategy",
     body: "5 principles of elegant social media presence with Flâneur's autonomous approach to content creation and distribution.",
-    platform: "x",
+    platform: "x" as const,
     status: "queued" as const,
     scheduledAt: new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString(),
     publishAttempts: 0,
@@ -48,7 +48,7 @@ const mockContent = [
     id: "3",
     title: "Behind the Algorithm",
     body: "An intimate look at Flâneur's sophisticated content creation process and the AI that powers autonomous social media management.",
-    platform: "instagram",
+    platform: "instagram" as const,
     status: "queued" as const,
     scheduledAt: new Date(Date.now() + 4 * 60 * 60 * 1000).toISOString(),
     publishAttempts: 0,
@@ -61,7 +61,7 @@ const mockContent = [
     id: "4",
     title: "Weekly Insights",
     body: "This week's curated insights on autonomous social media management, featuring the latest trends and Flâneur's innovative approach.",
-    platform: "telegram",
+    platform: "telegram" as const,
     status: "draft" as const,
     publishAttempts: 0,
     createdAt: new Date(Date.now() - 30 * 60 * 1000),
@@ -72,7 +72,7 @@ const mockContent = [
     id: "5",
     title: "Revolutionary Platform Evolution",
     body: "Announcing Flâneur's revolutionary next-generation autonomous features that will disrupt the social media landscape!",
-    platform: "linkedin",
+    platform: "linkedin" as const,
     status: "held" as const,
     scheduledAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
     publishAttempts: 2,
@@ -89,7 +89,7 @@ const mockContent = [
     id: "6",
     title: "Analytics Deep Dive",
     body: "Understanding your social media metrics is crucial for growth. Let's explore the key performance indicators that matter.",
-    platform: "x",
+    platform: "x" as const,
     status: "error" as const,
     scheduledAt: new Date(Date.now() - 30 * 60 * 1000).toISOString(),
     publishAttempts: 3,
@@ -184,6 +184,11 @@ export const contentQueueProcedure = publicProcedure
         (item as any).status = 'published';
         (item as any).publishedAt = new Date().toISOString();
         item.publishAttempts = 1;
+        (item as any).platformLimitsInfo = {
+          textLength: item.body.length,
+          maxLength: 3000,
+          hasMedia: !!item.mediaUrl
+        };
         console.log(`[Content] Item ${item.id} published successfully`);
       } else {
         (item as any).status = 'error';
@@ -264,6 +269,11 @@ export const contentRetryProcedure = publicProcedure
         (item as any).status = 'published';
         (item as any).publishedAt = new Date().toISOString();
         item.publishAttempts = item.publishAttempts + 1;
+        (item as any).platformLimitsInfo = {
+          textLength: item.body.length,
+          maxLength: 3000,
+          hasMedia: !!item.mediaUrl
+        };
         console.log(`[Content] Retry for item ${item.id} succeeded`);
       } else {
         (item as any).status = 'error';
@@ -313,7 +323,17 @@ export const contentCreateProcedure = publicProcedure
       metrics: null
     };
     
-    mockContent.push(newItem as any);
+    // Add platform limits info for new items
+    const itemWithLimits = {
+      ...newItem,
+      platformLimitsInfo: {
+        textLength: input.body.length,
+        maxLength: input.platform === 'x' ? 280 : 3000,
+        hasMedia: !!input.mediaUrl
+      }
+    };
+    
+    mockContent.push(itemWithLimits as any);
     
     return {
       success: true,

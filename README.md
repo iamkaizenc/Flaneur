@@ -1,453 +1,311 @@
-# Flâneur — Autonomous Social Media Agency
+# Flâneur - Autonomous Social Media Agent
 
-A sophisticated mobile application for managing autonomous social media marketing through AI-powered agents. Flâneur provides elegant, minimalist control over your social media presence with intelligent automation.
+A sophisticated mobile application that transforms social media strategy through intelligent automation and content curation. Built with React Native, Expo, and a powerful tRPC backend.
 
-## 🎯 Project Overview
+## 🎯 5-Minute Demo Flow
 
-Flâneur is an autonomous social media management platform that allows users to guide AI agents through strategic prompts. The system operates 24/7, planning, creating, publishing, and optimizing content across multiple social platforms.
+Experience the complete Flâneur workflow in just 5 minutes:
 
-### Key Features
+### Demo Setup (DRY_RUN Mode)
+- **Environment**: DRY_RUN=ON (simulates all external APIs)
+- **Mock Data**: 1 workspace, X+Telegram connected, 6 queued items, 7 days metrics
+- **Plan**: Platinum (all features enabled)
+- **Guardrails**: Banned words include "revolutionary" (for held example)
 
-- **Autonomous Operation**: AI agents work continuously to manage your social presence
-- **Strategic Prompts**: Guide your AI with simple, powerful course corrections
-- **Multi-Platform Support**: X (Twitter), Instagram, LinkedIn, Telegram, TikTok, Facebook
-- **Real-time Analytics**: Live performance monitoring and intelligent insights
-- **Premium Design**: Monochrome aesthetic with serif/sans-serif typography harmony
+### Demo Steps
 
-## 🏗️ Architecture
+1. **Settings > Connections** 
+   - View X + Telegram "Connected" status with last refresh times
+   - See LinkedIn "Expired" with "Fix" button
+   - Test OAuth flow (simulated in DRY_RUN)
 
-### Mobile App (React Native + Expo)
-- **Flow Screen**: Live status monitoring and task queue
-- **Course Screen**: Strategic prompt management and settings
-- **Content Screen**: Calendar view and content pipeline
-- **Growth Screen**: Analytics, metrics, and AI insights
+2. **Agent Tab** (if implemented)
+   - Prompt: "September launch tweet + LinkedIn post"
+   - AI generates suggestions → Apply → Creates draft content
 
-### Core Technologies
-- React Native with Expo SDK 53
-- TypeScript with strict type checking
-- React Query for server state management
-- AsyncStorage for local persistence
-- Lucide React Native for icons
+3. **Content Management**
+   - Open draft, edit content → Queue (status=queued)
+   - View "Held" example with guardrail reason
+   - Use "Review & Requeue" to fix held content
 
-## 🎨 Design System
+4. **Publisher Pipeline**
+   - Watch log trail: queued → publishing → success (DRY_RUN)
+   - Observe quota/window rules enforcement
+   - See retry logic for failed items
 
-### Brand Identity
-- **Name**: Flâneur (French: "one who strolls")
-- **Aesthetic**: Minimalist, premium, monochrome
-- **Typography**: Serif headings + Sans-serif body text
-- **Colors**: High-contrast black and white
+5. **Growth Analytics**
+   - 7-day performance charts
+   - 2+ insights including 1 anomaly detection
+   - "Best 3 / Weak 3" content performance
 
-### Theme Configuration
-```typescript
-export const theme = {
-  colors: {
-    black: '#000000',
-    white: '#FFFFFF',
-    gray: { /* 50-900 scale */ }
-  },
-  typography: {
-    serif: { fontFamily: 'serif' },
-    sansSerif: { fontFamily: 'system' }
-  }
-}
-```
+6. **Plan Management**
+   - Switch Premium → automation toggles disabled + Upgrade CTA
+   - Switch Free → ads shown + feature limitations
+   - Demonstrate plan-based feature gating
 
-## 📱 Screen Details
+7. **Profile & Security**
+   - Change profile picture (optimistic UI update)
+   - Password change flow with validation
+   - Account deletion with confirmation modal
 
-### Flow Screen
-- **Live Status**: Current AI operations with progress indicators
-- **Task Queue**: Upcoming content creation and publishing
-- **Today's Activity**: Published content with performance metrics
-- **Quick Stats**: Success rate, reach, and queue status
+### Key Demo Points
+- **Real-time Updates**: UI reflects backend state changes
+- **Error Handling**: Graceful failures with user-friendly messages  
+- **Plan Enforcement**: Features disabled based on subscription tier
+- **Security**: All sensitive operations require confirmation
 
-### Course Screen
-- **Strategic Prompts**: Text-based guidance for AI behavior
-- **Focus Areas**: Product, Brand, Industry, Community
-- **Tone Settings**: Informative, Casual, Professional, Bold
-- **Risk Levels**: Conservative, Normal, Aggressive
-
-### Content Screen
-- **Calendar View**: Weekly content distribution visualization
-- **Status Filters**: Draft, Queued, Published, Held content
-- **Content Cards**: Preview, platform, scheduling, and status
-- **Detail Navigation**: Tap to view full content details
-
-### Growth Screen
-- **Metrics Grid**: Followers, Impressions, Engagement, Comments
-- **Growth Charts**: Weekly performance visualization
-- **AI Insights**: Anomaly detection and optimization opportunities
-- **Performance Summary**: Intelligent analysis and recommendations
-
-## 🔧 Development Setup
+## 🚀 Quick Start
 
 ### Prerequisites
-- Node.js 18+ with Bun package manager
-- Expo CLI and development tools
+- Node.js 18+ and npm/yarn
+- Expo CLI: `npm install -g @expo/cli`
 - iOS Simulator or Android Emulator (optional)
 
 ### Installation
-```bash
-# Clone the repository
-git clone <repository-url>
-cd flaneur-app
 
-# Install dependencies
-bun install
+1. **Clone and Install**
+   ```bash
+   git clone <repository-url>
+   cd flaneur
+   npm install
+   ```
 
-# Start development server
-bun run start
+2. **Environment Setup**
+   ```bash
+   cp .env.example .env
+   # Edit .env with your configuration (DRY_RUN=true for demo)
+   ```
 
-# Start with web preview
-bun run start-web
-```
+3. **Start Development**
+   ```bash
+   npm run dev
+   ```
 
-### Environment Configuration
-Create `.env` file with required variables:
-```env
-# API Configuration
-API_BASE_URL=https://api.flaneur.app
-OPENAI_API_KEY=your_openai_key
+4. **Open the App**
+   - Web: Opens automatically in browser
+   - Mobile: Scan QR code with Expo Go app
+   - Simulator: Press `i` for iOS or `a` for Android
 
-# Platform API Keys
-TWITTER_CLIENT_ID=your_twitter_client_id
-TWITTER_CLIENT_SECRET=your_twitter_client_secret
-INSTAGRAM_APP_ID=your_instagram_app_id
-LINKEDIN_CLIENT_ID=your_linkedin_client_id
-TELEGRAM_BOT_TOKEN=your_telegram_bot_token
+## 🏗️ Architecture
 
-# Development Settings
-DRY_RUN=true
-LOG_LEVEL=debug
-```
+### Frontend (React Native + Expo)
+- **Framework**: Expo SDK 53 with React Native Web compatibility
+- **Navigation**: Expo Router (file-based routing)
+- **State Management**: tRPC + React Query for server state, @nkzw/create-context-hook for local state
+- **Styling**: React Native StyleSheet with theme system
+- **Icons**: Lucide React Native
 
-## 🚀 Platform Integration
+### Backend (Node.js + Hono + tRPC)
+- **Runtime**: Node.js with Hono web framework
+- **API**: tRPC for type-safe client-server communication
+- **Validation**: Zod schemas with SuperJSON serialization
+- **Authentication**: JWT-based with secure session management
+- **OAuth**: Platform-specific integrations with token encryption
+
+### Key Features
+- **DRY_RUN Mode**: Complete simulation for development/demo
+- **Plan-Based Gating**: Server-side feature enforcement
+- **Real-time Updates**: Optimistic UI with query invalidation
+- **Cross-Platform**: Web, iOS, and Android support
+- **Type Safety**: End-to-end TypeScript with strict checking
+
+## 📱 Platform Integrations
 
 ### Supported Platforms
-- **X (Twitter)**: OAuth 2.0, posting, basic metrics
-- **Instagram**: Graph API, feed/reels, insights
-- **LinkedIn**: Company pages, sharing, analytics
-- **Telegram**: Bot API, channel posting
-- **TikTok**: Business API, video upload (planned)
-- **Facebook**: Pages API, posting, metrics (planned)
+- **X (Twitter)**: OAuth 2.0, text + media publishing, engagement metrics
+- **Instagram**: Graph API, image/carousel/reels, basic insights  
+- **LinkedIn**: Company pages, professional content, reactions/impressions
+- **TikTok**: Business API, video upload, basic metrics
+- **Facebook**: Pages API, post publishing, engagement data
+- **Telegram**: Bot API, channel posting, message delivery
 
 ### OAuth Flow
-1. User initiates platform connection
+1. User initiates connection in Settings
 2. Redirect to platform OAuth endpoint
-3. Handle callback and token exchange
-4. Store encrypted tokens with refresh capability
-5. Verify permissions and account details
+3. Exchange authorization code for access token
+4. Encrypt and store tokens with AES-GCM
+5. Auto-refresh tokens when needed
+6. Graceful handling of expired/revoked tokens
 
-### Content Publishing
-- **Rate Limiting**: Platform-specific limits with backoff
-- **Retry Logic**: Exponential backoff for failed requests
-- **Guardrails**: Content filtering and risk assessment
-- **Scheduling**: Optimal timing based on audience analysis
+## 🔧 Configuration
 
-## 📊 Data Management
+### Environment Variables
 
-### State Architecture
-- **React Query**: Server state and caching
-- **AsyncStorage**: Local persistence for settings
-- **Context Providers**: Shared application state
-- **Type Safety**: Strict TypeScript throughout
-
-### Content Pipeline
-```typescript
-interface ContentItem {
-  id: string;
-  title: string;
-  platform: string;
-  status: "draft" | "queued" | "published" | "held";
-  scheduledTime: string;
-  preview: string;
-}
+#### Core Settings
+```bash
+NODE_ENV=development
+BASE_URL=http://localhost:3000
+DRY_RUN=true  # Set to false for production
 ```
 
-### Analytics Schema
-```typescript
-interface Metrics {
-  followers: string;
-  followersChange: number;
-  impressions: string;
-  impressionsChange: number;
-  engagement: string;
-  engagementChange: number;
-  growthData: number[];
-}
+#### OAuth Credentials (required when DRY_RUN=false)
+```bash
+X_CLIENT_ID=your_twitter_client_id
+X_CLIENT_SECRET=your_twitter_client_secret
+INSTAGRAM_CLIENT_ID=your_instagram_app_id
+# ... (see .env.example for complete list)
 ```
 
-## 🛡️ Security & Privacy
+#### Security
+```bash
+ENCRYPTION_KEY=your_32_character_key  # Generate with: openssl rand -hex 32
+JWT_SECRET=your_jwt_secret
+```
+
+### Publishing Rules
+- **Daily Limits**: Per-platform quotas (configurable)
+- **Posting Window**: 08:00-22:00 (configurable)
+- **Guardrails**: Banned words/tags with risk levels
+- **Rate Limiting**: Exponential backoff on API failures
+
+## 🧪 Development
+
+### Scripts
+```bash
+npm run dev          # Start development server
+npm run build        # Build for production  
+npm run test         # Run test suite
+npm run typecheck    # TypeScript validation
+npm run lint         # ESLint checking
+```
+
+### Project Structure
+```
+├── app/                 # Expo Router pages
+│   ├── (tabs)/         # Tab navigation
+│   ├── _layout.tsx     # Root layout
+│   └── onboarding.tsx  # Auth flows
+├── backend/            # tRPC API server
+│   ├── trpc/          # Route definitions
+│   ├── types/         # Shared schemas
+│   └── hono.ts        # Server entry
+├── components/         # Reusable UI components
+├── hooks/             # Custom React hooks
+├── providers/         # Context providers
+└── constants/         # Theme and configuration
+```
+
+### Adding New Features
+
+1. **Backend Route**
+   ```typescript
+   // backend/trpc/routes/feature/route.ts
+   export const featureProcedure = publicProcedure
+     .input(schema)
+     .mutation(async ({ input }) => {
+       // Implementation
+     });
+   ```
+
+2. **Frontend Hook**
+   ```typescript
+   // hooks/useFeature.ts
+   export const useFeature = () => {
+     const mutation = trpc.feature.action.useMutation();
+     return { action: mutation.mutate, isLoading: mutation.isLoading };
+   };
+   ```
+
+3. **UI Component**
+   ```typescript
+   // components/FeatureComponent.tsx
+   export const FeatureComponent = () => {
+     const { action } = useFeature();
+     return <TouchableOpacity onPress={() => action(data)} />;
+   };
+   ```
+
+## 🔒 Security
 
 ### Data Protection
-- **Token Encryption**: AES-GCM encryption for stored credentials
-- **Secure Storage**: Platform-specific secure storage APIs
-- **Network Security**: HTTPS-only communication
-- **Privacy First**: Minimal data collection and retention
+- **Token Encryption**: AES-GCM with environment-based keys
+- **Password Hashing**: Argon2id (when implemented)
+- **Session Management**: JWT with secure expiration
+- **Input Validation**: Zod schemas on all endpoints
 
-### Content Safety
-- **Guardrails**: Configurable content filtering
-- **Risk Assessment**: Automated content risk scoring
-- **Manual Review**: Hold queue for sensitive content
-- **Compliance**: Platform ToS adherence monitoring
+### Privacy
+- **Local Storage**: Minimal data persistence
+- **API Calls**: All external requests logged and monitored
+- **User Data**: Encrypted at rest, secure transmission
+- **OAuth Tokens**: Never logged or exposed in client
 
-## 🧪 Testing Strategy
+## 📊 Monitoring & Analytics
 
-### Test Coverage
-- **Unit Tests**: Core business logic and utilities
-- **Integration Tests**: Platform adapters and API calls
-- **Component Tests**: UI components and interactions
-- **E2E Tests**: Critical user flows and scenarios
+### Built-in Analytics
+- **Content Performance**: Impressions, engagement, reach
+- **Anomaly Detection**: 3-sigma deviation alerts
+- **Usage Tracking**: API quotas, rate limits, errors
+- **Plan Enforcement**: Feature usage monitoring
 
-### Quality Assurance
-- **TypeScript**: Strict type checking and validation
-- **ESLint**: Code quality and consistency rules
-- **Prettier**: Automated code formatting
-- **Husky**: Pre-commit hooks and validation
+### Logging
+- **Structured Logging**: JSON format with correlation IDs
+- **Error Tracking**: Typed errors with context
+- **Performance**: Request timing and optimization
+- **Audit Trail**: All user actions and system events
 
-## 📈 Performance Optimization
+## 🚢 Deployment
 
-### Mobile Performance
-- **React.memo()**: Component memoization for expensive renders
-- **useCallback()**: Function memoization for stable references
-- **useMemo()**: Value memoization for computed data
-- **Image Optimization**: Proper sizing and caching strategies
-
-### Network Efficiency
-- **React Query**: Intelligent caching and background updates
-- **Request Batching**: Combine multiple API calls when possible
-- **Offline Support**: Graceful degradation without connectivity
-- **Progressive Loading**: Skeleton screens and lazy loading
-
-## 🚀 Deployment
-
-### Build Configuration
-```json
-{
-  "expo": {
-    "name": "Flâneur",
-    "slug": "flaneur-autonomous-social-media",
-    "version": "1.0.0",
-    "icon": "./assets/brand/flaneur-icon-ios-1024.png",
-    "splash": {
-      "image": "./assets/brand/flaneur-logo-white.png",
-      "backgroundColor": "#000000"
-    }
-  }
-}
+### Development
+```bash
+npm run dev  # Local development with hot reload
 ```
 
-### Asset Management
-- **Logo Assets**: Multiple resolutions for different contexts
-- **App Icons**: iOS and Android adaptive icons
-- **Splash Screens**: Platform-specific splash configurations
-- **Brand Guidelines**: Consistent visual identity across platforms
+### Production Build
+```bash
+npm run build     # Build optimized bundle
+npm run preview   # Test production build locally
+```
 
-## 🔮 Future Roadmap
-
-### Phase 2 Features
-- **Advanced Analytics**: Machine learning insights and predictions
-- **Multi-Account Management**: Enterprise-level account orchestration
-- **A/B Testing**: Automated content variation testing
-- **Voice Commands**: Natural language prompt input
-
-### Platform Expansion
-- **TikTok Integration**: Full video creation and publishing
-- **YouTube Shorts**: Short-form video automation
-- **Pinterest**: Visual content strategy automation
-- **Reddit**: Community engagement automation
-
-### AI Enhancements
-- **GPT-4 Integration**: Advanced content generation
-- **Image Generation**: Automated visual content creation
-- **Video Synthesis**: AI-powered video content
-- **Sentiment Analysis**: Real-time audience mood tracking
-
-## 📚 Documentation
-
-### API Documentation
-- **Platform Adapters**: Integration guides for each social platform
-- **Authentication**: OAuth flows and token management
-- **Rate Limiting**: Platform-specific limits and handling
-- **Error Handling**: Comprehensive error classification and recovery
-
-### User Guides
-- **Getting Started**: Onboarding and initial setup
-- **Platform Connection**: Step-by-step connection guides
-- **Content Strategy**: Best practices for prompt engineering
-- **Analytics Interpretation**: Understanding metrics and insights
+### Platform Deployment
+- **Web**: Static hosting (Vercel, Netlify)
+- **Mobile**: Expo Application Services (EAS)
+- **Backend**: Node.js hosting (Railway, Render)
 
 ## 🤝 Contributing
 
-### Development Guidelines
-- **Code Style**: Follow established TypeScript and React Native patterns
-- **Commit Messages**: Use conventional commit format
-- **Pull Requests**: Include tests and documentation updates
-- **Issue Reporting**: Use provided templates for bugs and features
+### Development Workflow
+1. Fork the repository
+2. Create feature branch: `git checkout -b feature/amazing-feature`
+3. Make changes with proper TypeScript types
+4. Add tests for new functionality
+5. Ensure all checks pass: `npm run typecheck && npm run lint`
+6. Submit pull request with clear description
 
-### Architecture Decisions
-- **Mobile-First**: Prioritize mobile experience and performance
-- **Type Safety**: Maintain strict TypeScript throughout
-- **Platform Compatibility**: Ensure cross-platform functionality
-- **Accessibility**: Follow WCAG guidelines for inclusive design
-
-## 💳 Plans & Settings Integration
-
-### Subscription Plans
-
-Flâneur offers three tiers designed for different user needs:
-
-#### Free Plan
-- **Features**: Basic queue, manual publish only
-- **Limits**: 1 connected account, 5 daily posts
-- **Analytics**: Disabled
-- **Automation**: Disabled
-- **Price**: Free
-
-#### Premium Plan ($9.99/month)
-- **Features**: Growth tracking + analytics ON, automation OFF
-- **Limits**: 3 connected accounts, 20 daily posts
-- **Analytics**: Enabled (growth charts, insights, anomaly detection)
-- **Automation**: Disabled (manual approval required)
-- **Price**: $9.99/month
-- **Popular**: Most chosen plan
-
-#### Platinum Plan ($19.99/month)
-- **Features**: Analytics + automation ON, unlimited features
-- **Limits**: 10 connected accounts, 100 daily posts
-- **Analytics**: Full analytics suite
-- **Automation**: Full automation (AI publishes without approval)
-- **Price**: $19.99/month
-- **Target**: Power users and agencies
-
-### Settings Screen Features
-
-#### Profile Management
-- **Avatar Upload**: Image picker with base64 encoding
-- **Display Name**: Editable user display name
-- **Email Management**: Update email with password confirmation
-- **Password Change**: Secure password update with validation
-- **Account Deletion**: Permanent account deletion with confirmation
-
-#### Subscription Management
-- **Current Plan Display**: Shows active plan with feature breakdown
-- **Feature Visualization**: Clear indicators for enabled/disabled features
-- **Upgrade Buttons**: Direct upgrade to Premium/Platinum
-- **Purchase Integration**: DRY_RUN mode for testing, LIVE mode for production
-- **Restore Purchases**: iOS/Android purchase restoration
-
-#### Platform Connections
-- **OAuth Integration**: Secure platform linking
-- **Connection Status**: Visual status badges (Connected/Expired)
-- **Account Management**: Connect/disconnect/reconnect flows
-- **Last Refresh**: Timestamp of last token refresh
-
-#### Posting Rules
-- **Daily Limits**: Per-platform posting quotas
-- **Posting Window**: Active hours (default 08:00-22:00)
-- **DRY_RUN Toggle**: Test mode vs live publishing
-- **Rate Limiting**: Automatic rate limit enforcement
-
-#### Content Guardrails
-- **Banned Words**: Configurable word filtering
-- **Risk Levels**: Conservative/Normal/Aggressive content policies
-- **Content Review**: Automatic holding of risky content
-- **Compliance**: Platform ToS adherence
-
-#### Notifications
-- **Email Notifications**: Configurable email alerts
-- **Telegram Integration**: Bot notifications for events
-- **Event Types**: Publish success/error, held content, anomalies
-- **Test Functions**: Send test notifications
-
-### Purchase Integration
-
-#### Development Mode (DRY_RUN)
-```typescript
-// Simulated purchase flow for testing
-const purchaseResult = await purchasePlan("premium");
-// Returns: { success: true, message: "Successfully purchased...", transactionId: "mock_txn_..." }
-```
-
-#### Production Integration
-- **iOS**: App Store In-App Purchases (expo-in-app-purchases)
-- **Android**: Google Play Billing (expo-in-app-purchases)
-- **Web**: Stripe/PayPal integration (future)
-- **Receipt Validation**: Server-side receipt verification
-- **Entitlement Management**: Real-time plan updates
-
-#### Feature Gating
-
-Server-side enforcement ensures plan limits are respected:
-
-```typescript
-// Example: Analytics endpoint requires Premium+
-export const analyticsRoute = requireFeature("analytics")
-  .query(async () => {
-    // This will throw if user is on Free plan
-    return getAnalyticsData();
-  });
-```
-
-### Environment Configuration
-
-```env
-# Purchase Configuration
-DRY_RUN=true                    # Enable test mode
-STRIPE_PUBLISHABLE_KEY=pk_test_... # Web payments
-APPLE_SHARED_SECRET=your_secret    # iOS receipt validation
-GOOGLE_SERVICE_ACCOUNT=path/to/key # Android validation
-
-# Plan Features
-FREE_DAILY_LIMIT=5
-PREMIUM_DAILY_LIMIT=20
-PLATINUM_DAILY_LIMIT=100
-```
-
-### Testing Scenarios
-
-#### Plan Upgrade Flow
-1. User on Free plan sees disabled features
-2. Taps "Upgrade to Premium" button
-3. Purchase flow initiated (DRY_RUN simulates success)
-4. Backend updates user plan
-5. UI refreshes to show enabled features
-6. Analytics tab becomes accessible
-
-#### Feature Gate Validation
-1. Free user attempts to access Growth screen
-2. Server returns feature gate error
-3. UI shows upgrade prompt with plan comparison
-4. User can upgrade directly from error state
-
-#### Purchase Restoration
-1. User reinstalls app or switches devices
-2. Taps "Restore Purchases" in Settings
-3. App queries App Store/Play Store for receipts
-4. Server validates receipts and updates plan
-5. Features are re-enabled based on active subscription
-
-### Common Issues & Solutions
-
-#### Purchase Failures
-- **Network Issues**: Retry with exponential backoff
-- **Invalid Receipts**: Clear cache and retry validation
-- **Plan Sync Issues**: Manual refresh via "Restore Purchases"
-
-#### Feature Gate Errors
-- **Stale Plan Data**: Force refresh user plan from server
-- **Cache Issues**: Clear React Query cache for plan data
-- **Server Sync**: Ensure backend plan matches client state
-
-#### Development Testing
-- **DRY_RUN Mode**: All purchases succeed immediately
-- **Plan Switching**: Manually change mock plan in backend
-- **Feature Testing**: Toggle plan features to test UI states
+### Code Standards
+- **TypeScript**: Strict mode with explicit types
+- **React**: Functional components with hooks
+- **Styling**: StyleSheet with theme consistency
+- **Testing**: Unit tests for business logic
+- **Documentation**: JSDoc for complex functions
 
 ## 📄 License
 
-This project is proprietary software. All rights reserved.
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## 🆘 Support
+
+### Common Issues
+
+**OAuth Connection Fails**
+- Verify client credentials in .env
+- Check redirect URI configuration
+- Ensure DRY_RUN=true for demo mode
+
+**TypeScript Errors**
+- Run `npm run typecheck` for detailed errors
+- Ensure all imports use correct paths
+- Check tRPC procedure types match usage
+
+**Mobile App Won't Load**
+- Clear Expo cache: `expo start -c`
+- Verify network connectivity
+- Check console for error messages
+
+### Getting Help
+- **Documentation**: Check README and code comments
+- **Issues**: Create GitHub issue with reproduction steps
+- **Discussions**: Use GitHub Discussions for questions
 
 ---
 
-**Flâneur** — *Autonomous Social Media Agency*  
-Elegant automation for the modern digital presence.
+**Flâneur** - Transforming social media through intelligent automation. Built with ❤️ using React Native and modern web technologies.
