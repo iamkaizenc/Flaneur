@@ -1,2 +1,631 @@
 import React from "react";
-import React from \"react\";\nimport {\n  StyleSheet,\n  Text,\n  View,\n  ScrollView,\n  TouchableOpacity,\n  Platform,\n  Image,\n  FlatList,\n} from \"react-native\";\nimport { SafeAreaView } from \"react-native-safe-area-context\";\nimport { \n  ArrowLeft,\n  Star,\n  Lock,\n  TrendingUp,\n  Users,\n  Heart,\n  Lightbulb,\n} from \"lucide-react-native\";\nimport { useRouter } from \"expo-router\";\nimport { theme } from \"@/constants/theme\";\nimport { trpc } from \"@/lib/trpc\";\nimport { useAIMarketer } from \"@/providers/AIMarketerProvider\";\n\ninterface SponsorCardProps {\n  sponsor: {\n    id: string;\n    brandName: string;\n    logo: string;\n    category: string;\n    budget: string;\n    requirements: {\n      minFollowers: number;\n      minEngagement: number;\n      minFameScore: number;\n    };\n    description: string;\n    status: string;\n    matchScore: number;\n  };\n  isLocked?: boolean;\n  userStats: {\n    followers: number;\n    engagementRate: number;\n    fameScore: number;\n  };\n}\n\ninterface TipCardProps {\n  tip: {\n    id: string;\n    title: string;\n    description: string;\n    impact: string;\n    icon: string;\n  };\n}\n\nconst SponsorCard: React.FC<SponsorCardProps> = ({ sponsor, isLocked, userStats }) => {\n  const getStatusColor = (status: string) => {\n    switch (status) {\n      case \"interested\": return \"#10B981\";\n      case \"reviewing\": return \"#F59E0B\";\n      case \"pending\": return \"#6B7280\";\n      default: return \"#6B7280\";\n    }\n  };\n\n  const getStatusText = (status: string) => {\n    switch (status) {\n      case \"interested\": return \"İlgileniyor\";\n      case \"reviewing\": return \"İnceliyor\";\n      case \"pending\": return \"Beklemede\";\n      default: return \"Bilinmiyor\";\n    }\n  };\n\n  return (\n    <TouchableOpacity \n      style={[styles.sponsorCard, isLocked && styles.sponsorCardLocked]} \n      activeOpacity={0.7}\n      disabled={isLocked}\n    >\n      {isLocked && (\n        <View style={styles.lockOverlay}>\n          <Lock size={24} color={theme.colors.gray[400]} />\n        </View>\n      )}\n      \n      <View style={styles.sponsorHeader}>\n        <Image source={{ uri: sponsor.logo }} style={styles.sponsorLogo} />\n        <View style={styles.sponsorInfo}>\n          <Text style={styles.sponsorName}>{sponsor.brandName}</Text>\n          <Text style={styles.sponsorCategory}>{sponsor.category}</Text>\n        </View>\n        <View style={styles.matchScoreContainer}>\n          <Text style={styles.matchScore}>{sponsor.matchScore}%</Text>\n          <Text style={styles.matchLabel}>Uyum</Text>\n        </View>\n      </View>\n\n      <Text style={styles.sponsorDescription}>{sponsor.description}</Text>\n      \n      <View style={styles.sponsorBudget}>\n        <Text style={styles.budgetLabel}>Bütçe:</Text>\n        <Text style={styles.budgetAmount}>{sponsor.budget}</Text>\n      </View>\n\n      <View style={styles.requirementsContainer}>\n        <Text style={styles.requirementsTitle}>Gereksinimler:</Text>\n        <View style={styles.requirementsList}>\n          <View style={styles.requirementItem}>\n            <Users size={14} color={theme.colors.gray[500]} />\n            <Text style={[\n              styles.requirementText,\n              userStats.followers >= sponsor.requirements.minFollowers ? styles.requirementMet : styles.requirementNotMet\n            ]}>\n              {sponsor.requirements.minFollowers.toLocaleString()} takipçi\n            </Text>\n          </View>\n          <View style={styles.requirementItem}>\n            <Heart size={14} color={theme.colors.gray[500]} />\n            <Text style={[\n              styles.requirementText,\n              userStats.engagementRate >= sponsor.requirements.minEngagement ? styles.requirementMet : styles.requirementNotMet\n            ]}>\n              %{sponsor.requirements.minEngagement} etkileşim\n            </Text>\n          </View>\n          <View style={styles.requirementItem}>\n            <Star size={14} color={theme.colors.gray[500]} />\n            <Text style={[\n              styles.requirementText,\n              userStats.fameScore >= sponsor.requirements.minFameScore ? styles.requirementMet : styles.requirementNotMet\n            ]}>\n              {sponsor.requirements.minFameScore} FameScore\n            </Text>\n          </View>\n        </View>\n      </View>\n\n      <View style={styles.sponsorFooter}>\n        <View style={[styles.statusBadge, { backgroundColor: getStatusColor(sponsor.status) + \"20\" }]}>\n          <Text style={[styles.statusText, { color: getStatusColor(sponsor.status) }]}>\n            {getStatusText(sponsor.status)}\n          </Text>\n        </View>\n      </View>\n    </TouchableOpacity>\n  );\n};\n\nconst TipCard: React.FC<TipCardProps> = ({ tip }) => (\n  <View style={styles.tipCard}>\n    <View style={styles.tipHeader}>\n      <Text style={styles.tipIcon}>{tip.icon}</Text>\n      <View style={styles.tipInfo}>\n        <Text style={styles.tipTitle}>{tip.title}</Text>\n        <Text style={styles.tipDescription}>{tip.description}</Text>\n      </View>\n      <Text style={styles.tipImpact}>{tip.impact}</Text>\n    </View>\n  </View>\n);\n\nexport default function SponsorHubScreen() {\n  const router = useRouter();\n  const { user } = useAIMarketer();\n  const sponsorQuery = trpc.sponsors.hub.useQuery({ userId: \"user-1\" });\n\n  // Check if user has premium/platinum plan\n  const hasAccess = user?.plan === \"premium\" || user?.plan === \"platinum\";\n\n  if (!hasAccess) {\n    return (\n      <SafeAreaView style={styles.container}>\n        <View style={styles.header}>\n          <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>\n            <ArrowLeft size={24} color={theme.colors.white} />\n          </TouchableOpacity>\n          <Text style={styles.headerTitle}>Sponsor Hub</Text>\n        </View>\n\n        <View style={styles.upsellContainer}>\n          <View style={styles.upsellCard}>\n            <Text style={styles.upsellTitle}>🌟 Sponsor Hub'a Erişim</Text>\n            <Text style={styles.upsellDescription}>\n              Markalar profiline bakıyor! Premium'a yükselt ve sponsor fırsatlarını keşfet.\n            </Text>\n            <TouchableOpacity style={styles.upgradeButton}>\n              <Text style={styles.upgradeButtonText}>Premium'a Yükselt</Text>\n            </TouchableOpacity>\n          </View>\n        </View>\n      </SafeAreaView>\n    );\n  }\n\n  return (\n    <SafeAreaView style={styles.container}>\n      <View style={styles.header}>\n        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>\n          <ArrowLeft size={24} color={theme.colors.white} />\n        </TouchableOpacity>\n        <Text style={styles.headerTitle}>Sponsor Hub</Text>\n      </View>\n\n      <ScrollView \n        contentContainerStyle={styles.scrollContent}\n        showsVerticalScrollIndicator={false}\n      >\n        {sponsorQuery.data && (\n          <>\n            <View style={styles.statsCard}>\n              <Text style={styles.statsTitle}>Profilin Durumu</Text>\n              <View style={styles.statsGrid}>\n                <View style={styles.statItem}>\n                  <Users size={20} color={\"#3B82F6\"} />\n                  <Text style={styles.statValue}>{sponsorQuery.data.userStats.followers.toLocaleString()}</Text>\n                  <Text style={styles.statLabel}>Takipçi</Text>\n                </View>\n                <View style={styles.statItem}>\n                  <Heart size={20} color={\"#EF4444\"} />\n                  <Text style={styles.statValue}>%{sponsorQuery.data.userStats.engagementRate}</Text>\n                  <Text style={styles.statLabel}>Etkileşim</Text>\n                </View>\n                <View style={styles.statItem}>\n                  <Star size={20} color={\"#F59E0B\"} />\n                  <Text style={styles.statValue}>{sponsorQuery.data.userStats.fameScore}</Text>\n                  <Text style={styles.statLabel}>FameScore</Text>\n                </View>\n              </View>\n            </View>\n\n            {sponsorQuery.data.eligibleSponsors.length > 0 && (\n              <View style={styles.section}>\n                <Text style={styles.sectionTitle}>Uygun Sponsorlar ({sponsorQuery.data.eligibleCount})</Text>\n                {sponsorQuery.data.eligibleSponsors.map((sponsor) => (\n                  <SponsorCard\n                    key={sponsor.id}\n                    sponsor={sponsor}\n                    userStats={sponsorQuery.data.userStats}\n                  />\n                ))}\n              </View>\n            )}\n\n            {sponsorQuery.data.lockedSponsors.length > 0 && (\n              <View style={styles.section}>\n                <Text style={styles.sectionTitle}>Kilitli Sponsorlar</Text>\n                <Text style={styles.sectionSubtitle}>\n                  Bu sponsorlara erişmek için profilini güçlendir\n                </Text>\n                {sponsorQuery.data.lockedSponsors.map((sponsor) => (\n                  <SponsorCard\n                    key={sponsor.id}\n                    sponsor={sponsor}\n                    userStats={sponsorQuery.data.userStats}\n                    isLocked\n                  />\n                ))}\n              </View>\n            )}\n\n            <View style={styles.section}>\n              <View style={styles.tipsHeader}>\n                <Lightbulb size={20} color={theme.colors.white} />\n                <Text style={styles.sectionTitle}>Profilini Güçlendir</Text>\n              </View>\n              <Text style={styles.sectionSubtitle}>\n                FameScore {sponsorQuery.data.nextMilestone.target}+ için ipuçları\n              </Text>\n              <View style={styles.milestoneProgress}>\n                <View style={styles.milestoneBar}>\n                  <View \n                    style={[\n                      styles.milestoneBarFill, \n                      { width: `${(sponsorQuery.data.nextMilestone.current / sponsorQuery.data.nextMilestone.target) * 100}%` }\n                    ]} \n                  />\n                </View>\n                <Text style={styles.milestoneText}>\n                  {sponsorQuery.data.nextMilestone.current}/{sponsorQuery.data.nextMilestone.target} \n                  ({sponsorQuery.data.nextMilestone.remaining} kaldı)\n                </Text>\n              </View>\n              \n              <FlatList\n                data={sponsorQuery.data.improvementTips}\n                keyExtractor={(item) => item.id}\n                renderItem={({ item }) => <TipCard tip={item} />}\n                scrollEnabled={false}\n              />\n            </View>\n          </>\n        )}\n      </ScrollView>\n    </SafeAreaView>\n  );\n}\n\nconst styles = StyleSheet.create({\n  container: {\n    flex: 1,\n    backgroundColor: theme.colors.black,\n  },\n  header: {\n    flexDirection: \"row\",\n    alignItems: \"center\",\n    paddingHorizontal: theme.spacing.md,\n    paddingVertical: theme.spacing.lg,\n    borderBottomWidth: 1,\n    borderBottomColor: theme.colors.gray[800],\n  },\n  backButton: {\n    marginRight: theme.spacing.md,\n  },\n  headerTitle: {\n    fontSize: 20,\n    fontWeight: \"600\" as const,\n    color: theme.colors.white,\n    fontFamily: theme.typography.serif.fontFamily,\n  },\n  scrollContent: {\n    paddingHorizontal: theme.spacing.md,\n    paddingBottom: theme.spacing.xl,\n    paddingTop: theme.spacing.md,\n  },\n  upsellContainer: {\n    flex: 1,\n    justifyContent: \"center\",\n    paddingHorizontal: theme.spacing.md,\n  },\n  upsellCard: {\n    backgroundColor: theme.colors.white,\n    borderRadius: theme.borderRadius.xl,\n    padding: theme.spacing.xl,\n    alignItems: \"center\",\n    ...Platform.select({\n      ios: {\n        shadowColor: theme.colors.black,\n        shadowOffset: { width: 0, height: 4 },\n        shadowOpacity: 0.1,\n        shadowRadius: 12,\n      },\n      android: {\n        elevation: 4,\n      },\n    }),\n  },\n  upsellTitle: {\n    fontSize: 24,\n    fontWeight: \"700\" as const,\n    color: theme.colors.black,\n    textAlign: \"center\",\n    marginBottom: 12,\n    fontFamily: theme.typography.serif.fontFamily,\n  },\n  upsellDescription: {\n    fontSize: 16,\n    color: theme.colors.gray[600],\n    textAlign: \"center\",\n    lineHeight: 24,\n    marginBottom: 24,\n  },\n  upgradeButton: {\n    backgroundColor: \"#10B981\",\n    borderRadius: theme.borderRadius.lg,\n    paddingVertical: 16,\n    paddingHorizontal: 32,\n  },\n  upgradeButtonText: {\n    fontSize: 16,\n    fontWeight: \"600\" as const,\n    color: theme.colors.white,\n  },\n  statsCard: {\n    backgroundColor: theme.colors.white,\n    borderRadius: theme.borderRadius.lg,\n    padding: theme.spacing.lg,\n    marginBottom: theme.spacing.lg,\n    ...Platform.select({\n      ios: {\n        shadowColor: theme.colors.black,\n        shadowOffset: { width: 0, height: 2 },\n        shadowOpacity: 0.1,\n        shadowRadius: 8,\n      },\n      android: {\n        elevation: 2,\n      },\n    }),\n  },\n  statsTitle: {\n    fontSize: 18,\n    fontWeight: \"600\" as const,\n    color: theme.colors.black,\n    marginBottom: 16,\n    fontFamily: theme.typography.serif.fontFamily,\n  },\n  statsGrid: {\n    flexDirection: \"row\",\n    justifyContent: \"space-around\",\n  },\n  statItem: {\n    alignItems: \"center\",\n    gap: 8,\n  },\n  statValue: {\n    fontSize: 20,\n    fontWeight: \"700\" as const,\n    color: theme.colors.black,\n    fontFamily: theme.typography.serif.fontFamily,\n  },\n  statLabel: {\n    fontSize: 12,\n    color: theme.colors.gray[500],\n    fontWeight: \"500\" as const,\n  },\n  section: {\n    marginBottom: theme.spacing.xl,\n  },\n  sectionTitle: {\n    fontSize: 20,\n    fontWeight: \"600\" as const,\n    color: theme.colors.white,\n    marginBottom: 8,\n    fontFamily: theme.typography.serif.fontFamily,\n  },\n  sectionSubtitle: {\n    fontSize: 14,\n    color: theme.colors.gray[400],\n    marginBottom: 16,\n  },\n  tipsHeader: {\n    flexDirection: \"row\",\n    alignItems: \"center\",\n    gap: 8,\n    marginBottom: 8,\n  },\n  milestoneProgress: {\n    marginBottom: 16,\n  },\n  milestoneBar: {\n    height: 8,\n    backgroundColor: theme.colors.gray[800],\n    borderRadius: 4,\n    marginBottom: 8,\n  },\n  milestoneBarFill: {\n    height: \"100%\",\n    backgroundColor: \"#10B981\",\n    borderRadius: 4,\n  },\n  milestoneText: {\n    fontSize: 12,\n    color: theme.colors.gray[400],\n    textAlign: \"center\",\n  },\n  sponsorCard: {\n    backgroundColor: theme.colors.white,\n    borderRadius: theme.borderRadius.lg,\n    padding: theme.spacing.md,\n    marginBottom: theme.spacing.md,\n    position: \"relative\",\n    ...Platform.select({\n      ios: {\n        shadowColor: theme.colors.black,\n        shadowOffset: { width: 0, height: 2 },\n        shadowOpacity: 0.1,\n        shadowRadius: 8,\n      },\n      android: {\n        elevation: 2,\n      },\n    }),\n  },\n  sponsorCardLocked: {\n    opacity: 0.6,\n  },\n  lockOverlay: {\n    position: \"absolute\",\n    top: 12,\n    right: 12,\n    zIndex: 1,\n  },\n  sponsorHeader: {\n    flexDirection: \"row\",\n    alignItems: \"center\",\n    marginBottom: 12,\n  },\n  sponsorLogo: {\n    width: 48,\n    height: 48,\n    borderRadius: 8,\n    marginRight: 12,\n  },\n  sponsorInfo: {\n    flex: 1,\n  },\n  sponsorName: {\n    fontSize: 16,\n    fontWeight: \"600\" as const,\n    color: theme.colors.black,\n    marginBottom: 2,\n  },\n  sponsorCategory: {\n    fontSize: 12,\n    color: theme.colors.gray[500],\n  },\n  matchScoreContainer: {\n    alignItems: \"center\",\n  },\n  matchScore: {\n    fontSize: 18,\n    fontWeight: \"700\" as const,\n    color: \"#10B981\",\n    fontFamily: theme.typography.serif.fontFamily,\n  },\n  matchLabel: {\n    fontSize: 10,\n    color: theme.colors.gray[500],\n  },\n  sponsorDescription: {\n    fontSize: 14,\n    color: theme.colors.gray[600],\n    lineHeight: 20,\n    marginBottom: 12,\n  },\n  sponsorBudget: {\n    flexDirection: \"row\",\n    alignItems: \"center\",\n    marginBottom: 12,\n  },\n  budgetLabel: {\n    fontSize: 14,\n    color: theme.colors.gray[500],\n    marginRight: 8,\n  },\n  budgetAmount: {\n    fontSize: 14,\n    fontWeight: \"600\" as const,\n    color: \"#10B981\",\n  },\n  requirementsContainer: {\n    marginBottom: 12,\n  },\n  requirementsTitle: {\n    fontSize: 12,\n    fontWeight: \"600\" as const,\n    color: theme.colors.gray[700],\n    marginBottom: 8,\n  },\n  requirementsList: {\n    flexDirection: \"row\",\n    flexWrap: \"wrap\",\n    gap: 12,\n  },\n  requirementItem: {\n    flexDirection: \"row\",\n    alignItems: \"center\",\n    gap: 4,\n  },\n  requirementText: {\n    fontSize: 12,\n  },\n  requirementMet: {\n    color: \"#10B981\",\n    fontWeight: \"500\" as const,\n  },\n  requirementNotMet: {\n    color: \"#EF4444\",\n    fontWeight: \"500\" as const,\n  },\n  sponsorFooter: {\n    flexDirection: \"row\",\n    justifyContent: \"flex-end\",\n  },\n  statusBadge: {\n    paddingHorizontal: 8,\n    paddingVertical: 4,\n    borderRadius: 12,\n  },\n  statusText: {\n    fontSize: 12,\n    fontWeight: \"500\" as const,\n  },\n  tipCard: {\n    backgroundColor: theme.colors.white,\n    borderRadius: theme.borderRadius.md,\n    padding: theme.spacing.md,\n    marginBottom: theme.spacing.sm,\n    ...Platform.select({\n      ios: {\n        shadowColor: theme.colors.black,\n        shadowOffset: { width: 0, height: 1 },\n        shadowOpacity: 0.05,\n        shadowRadius: 4,\n      },\n      android: {\n        elevation: 1,\n      },\n    }),\n  },\n  tipHeader: {\n    flexDirection: \"row\",\n    alignItems: \"center\",\n  },\n  tipIcon: {\n    fontSize: 24,\n    marginRight: 12,\n  },\n  tipInfo: {\n    flex: 1,\n  },\n  tipTitle: {\n    fontSize: 14,\n    fontWeight: \"600\" as const,\n    color: theme.colors.black,\n    marginBottom: 2,\n  },\n  tipDescription: {\n    fontSize: 12,\n    color: theme.colors.gray[600],\n  },\n  tipImpact: {\n    fontSize: 12,\n    fontWeight: \"600\" as const,\n    color: \"#10B981\",\n  },\n});
+import {
+  StyleSheet,
+  Text,
+  View,
+  ScrollView,
+  TouchableOpacity,
+  Platform,
+  Image,
+  FlatList,
+} from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { 
+  ArrowLeft,
+  Star,
+  Lock,
+  Users,
+  Heart,
+  Lightbulb,
+} from "lucide-react-native";
+import { useRouter } from "expo-router";
+import { theme } from "@/constants/theme";
+import { trpc } from "@/lib/trpc";
+
+interface SponsorCardProps {
+  sponsor: {
+    id: string;
+    brandName: string;
+    logo: string;
+    category: string;
+    budget: string;
+    requirements: {
+      minFollowers: number;
+      minEngagement: number;
+      minFameScore: number;
+    };
+    description: string;
+    status: string;
+    matchScore: number;
+  };
+  isLocked?: boolean;
+  userStats: {
+    followers: number;
+    engagementRate: number;
+    fameScore: number;
+  };
+}
+
+interface TipCardProps {
+  tip: {
+    id: string;
+    title: string;
+    description: string;
+    impact: string;
+    icon: string;
+  };
+}
+
+const SponsorCard: React.FC<SponsorCardProps> = ({ sponsor, isLocked, userStats }) => {
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case "interested": return "#10B981";
+      case "reviewing": return "#F59E0B";
+      case "pending": return "#6B7280";
+      default: return "#6B7280";
+    }
+  };
+
+  const getStatusText = (status: string) => {
+    switch (status) {
+      case "interested": return "İlgileniyor";
+      case "reviewing": return "İnceliyor";
+      case "pending": return "Beklemede";
+      default: return "Bilinmiyor";
+    }
+  };
+
+  return (
+    <TouchableOpacity 
+      style={[styles.sponsorCard, isLocked && styles.sponsorCardLocked]} 
+      activeOpacity={0.7}
+      disabled={isLocked}
+    >
+      {isLocked && (
+        <View style={styles.lockOverlay}>
+          <Lock size={24} color={theme.colors.gray[400]} />
+        </View>
+      )}
+      
+      <View style={styles.sponsorHeader}>
+        <Image source={{ uri: sponsor.logo }} style={styles.sponsorLogo} />
+        <View style={styles.sponsorInfo}>
+          <Text style={styles.sponsorName}>{sponsor.brandName}</Text>
+          <Text style={styles.sponsorCategory}>{sponsor.category}</Text>
+        </View>
+        <View style={styles.matchScoreContainer}>
+          <Text style={styles.matchScore}>{sponsor.matchScore}%</Text>
+          <Text style={styles.matchLabel}>Uyum</Text>
+        </View>
+      </View>
+
+      <Text style={styles.sponsorDescription}>{sponsor.description}</Text>
+      
+      <View style={styles.sponsorBudget}>
+        <Text style={styles.budgetLabel}>Bütçe:</Text>
+        <Text style={styles.budgetAmount}>{sponsor.budget}</Text>
+      </View>
+
+      <View style={styles.requirementsContainer}>
+        <Text style={styles.requirementsTitle}>Gereksinimler:</Text>
+        <View style={styles.requirementsList}>
+          <View style={styles.requirementItem}>
+            <Users size={14} color={theme.colors.gray[500]} />
+            <Text style={[
+              styles.requirementText,
+              userStats.followers >= sponsor.requirements.minFollowers ? styles.requirementMet : styles.requirementNotMet
+            ]}>
+              {sponsor.requirements.minFollowers.toLocaleString()} takipçi
+            </Text>
+          </View>
+          <View style={styles.requirementItem}>
+            <Heart size={14} color={theme.colors.gray[500]} />
+            <Text style={[
+              styles.requirementText,
+              userStats.engagementRate >= sponsor.requirements.minEngagement ? styles.requirementMet : styles.requirementNotMet
+            ]}>
+              %{sponsor.requirements.minEngagement} etkileşim
+            </Text>
+          </View>
+          <View style={styles.requirementItem}>
+            <Star size={14} color={theme.colors.gray[500]} />
+            <Text style={[
+              styles.requirementText,
+              userStats.fameScore >= sponsor.requirements.minFameScore ? styles.requirementMet : styles.requirementNotMet
+            ]}>
+              {sponsor.requirements.minFameScore} FameScore
+            </Text>
+          </View>
+        </View>
+      </View>
+
+      <View style={styles.sponsorFooter}>
+        <View style={[styles.statusBadge, { backgroundColor: getStatusColor(sponsor.status) + "20" }]}>
+          <Text style={[styles.statusText, { color: getStatusColor(sponsor.status) }]}>
+            {getStatusText(sponsor.status)}
+          </Text>
+        </View>
+      </View>
+    </TouchableOpacity>
+  );
+};
+
+const TipCard: React.FC<TipCardProps> = ({ tip }) => (
+  <View style={styles.tipCard}>
+    <View style={styles.tipHeader}>
+      <Text style={styles.tipIcon}>{tip.icon}</Text>
+      <View style={styles.tipInfo}>
+        <Text style={styles.tipTitle}>{tip.title}</Text>
+        <Text style={styles.tipDescription}>{tip.description}</Text>
+      </View>
+      <Text style={styles.tipImpact}>{tip.impact}</Text>
+    </View>
+  </View>
+);
+
+export default function SponsorHubScreen() {
+  const router = useRouter();
+  const sponsorQuery = trpc.sponsors.hub.useQuery({ userId: "user-1" });
+
+  // Mock user plan - in real app this would come from auth/user context
+  const userPlan = "premium"; // "free" | "premium" | "platinum"
+  const hasAccess = userPlan === "premium" || userPlan === "platinum";
+
+  if (!hasAccess) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.header}>
+          <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+            <ArrowLeft size={24} color={theme.colors.white} />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>Sponsor Hub</Text>
+        </View>
+
+        <View style={styles.upsellContainer}>
+          <View style={styles.upsellCard}>
+            <Text style={styles.upsellTitle}>🌟 Sponsor Hub&apos;a Erişim</Text>
+            <Text style={styles.upsellDescription}>
+              Markalar profiline bakıyor! Premium&apos;a yükselt ve sponsor fırsatlarını keşfet.
+            </Text>
+            <TouchableOpacity style={styles.upgradeButton}>
+              <Text style={styles.upgradeButtonText}>Premium&apos;a Yükselt</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  return (
+    <SafeAreaView style={styles.container}>
+      <View style={styles.header}>
+        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+          <ArrowLeft size={24} color={theme.colors.white} />
+        </TouchableOpacity>
+        <Text style={styles.headerTitle}>Sponsor Hub</Text>
+      </View>
+
+      <ScrollView 
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
+        {sponsorQuery.data && (
+          <>
+            <View style={styles.statsCard}>
+              <Text style={styles.statsTitle}>Profilin Durumu</Text>
+              <View style={styles.statsGrid}>
+                <View style={styles.statItem}>
+                  <Users size={20} color={"#3B82F6"} />
+                  <Text style={styles.statValue}>{sponsorQuery.data.userStats.followers.toLocaleString()}</Text>
+                  <Text style={styles.statLabel}>Takipçi</Text>
+                </View>
+                <View style={styles.statItem}>
+                  <Heart size={20} color={"#EF4444"} />
+                  <Text style={styles.statValue}>%{sponsorQuery.data.userStats.engagementRate}</Text>
+                  <Text style={styles.statLabel}>Etkileşim</Text>
+                </View>
+                <View style={styles.statItem}>
+                  <Star size={20} color={"#F59E0B"} />
+                  <Text style={styles.statValue}>{sponsorQuery.data.userStats.fameScore}</Text>
+                  <Text style={styles.statLabel}>FameScore</Text>
+                </View>
+              </View>
+            </View>
+
+            {sponsorQuery.data.eligibleSponsors.length > 0 && (
+              <View style={styles.section}>
+                <Text style={styles.sectionTitle}>Uygun Sponsorlar ({sponsorQuery.data.eligibleCount})</Text>
+                {sponsorQuery.data.eligibleSponsors.map((sponsor) => (
+                  <SponsorCard
+                    key={sponsor.id}
+                    sponsor={sponsor}
+                    userStats={sponsorQuery.data.userStats}
+                  />
+                ))}
+              </View>
+            )}
+
+            {sponsorQuery.data.lockedSponsors.length > 0 && (
+              <View style={styles.section}>
+                <Text style={styles.sectionTitle}>Kilitli Sponsorlar</Text>
+                <Text style={styles.sectionSubtitle}>
+                  Bu sponsorlara erişmek için profilini güçlendir
+                </Text>
+                {sponsorQuery.data.lockedSponsors.map((sponsor) => (
+                  <SponsorCard
+                    key={sponsor.id}
+                    sponsor={sponsor}
+                    userStats={sponsorQuery.data.userStats}
+                    isLocked
+                  />
+                ))}
+              </View>
+            )}
+
+            <View style={styles.section}>
+              <View style={styles.tipsHeader}>
+                <Lightbulb size={20} color={theme.colors.white} />
+                <Text style={styles.sectionTitle}>Profilini Güçlendir</Text>
+              </View>
+              <Text style={styles.sectionSubtitle}>
+                FameScore {sponsorQuery.data.nextMilestone.target}+ için ipuçları
+              </Text>
+              <View style={styles.milestoneProgress}>
+                <View style={styles.milestoneBar}>
+                  <View 
+                    style={[
+                      styles.milestoneBarFill, 
+                      { width: `${(sponsorQuery.data.nextMilestone.current / sponsorQuery.data.nextMilestone.target) * 100}%` }
+                    ]} 
+                  />
+                </View>
+                <Text style={styles.milestoneText}>
+                  {sponsorQuery.data.nextMilestone.current}/{sponsorQuery.data.nextMilestone.target} 
+                  ({sponsorQuery.data.nextMilestone.remaining} kaldı)
+                </Text>
+              </View>
+              
+              <FlatList
+                data={sponsorQuery.data.improvementTips}
+                keyExtractor={(item) => item.id}
+                renderItem={({ item }) => <TipCard tip={item} />}
+                scrollEnabled={false}
+              />
+            </View>
+          </>
+        )}
+      </ScrollView>
+    </SafeAreaView>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: theme.colors.black,
+  },
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: theme.spacing.md,
+    paddingVertical: theme.spacing.lg,
+    borderBottomWidth: 1,
+    borderBottomColor: theme.colors.gray[800],
+  },
+  backButton: {
+    marginRight: theme.spacing.md,
+  },
+  headerTitle: {
+    fontSize: 20,
+    fontWeight: "600" as const,
+    color: theme.colors.white,
+    fontFamily: theme.typography.serif.fontFamily,
+  },
+  scrollContent: {
+    paddingHorizontal: theme.spacing.md,
+    paddingBottom: theme.spacing.xl,
+    paddingTop: theme.spacing.md,
+  },
+  upsellContainer: {
+    flex: 1,
+    justifyContent: "center",
+    paddingHorizontal: theme.spacing.md,
+  },
+  upsellCard: {
+    backgroundColor: theme.colors.white,
+    borderRadius: theme.borderRadius.xl,
+    padding: theme.spacing.xl,
+    alignItems: "center",
+    ...Platform.select({
+      ios: {
+        shadowColor: theme.colors.black,
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.1,
+        shadowRadius: 12,
+      },
+      android: {
+        elevation: 4,
+      },
+    }),
+  },
+  upsellTitle: {
+    fontSize: 24,
+    fontWeight: "700" as const,
+    color: theme.colors.black,
+    textAlign: "center",
+    marginBottom: 12,
+    fontFamily: theme.typography.serif.fontFamily,
+  },
+  upsellDescription: {
+    fontSize: 16,
+    color: theme.colors.gray[600],
+    textAlign: "center",
+    lineHeight: 24,
+    marginBottom: 24,
+  },
+  upgradeButton: {
+    backgroundColor: "#10B981",
+    borderRadius: theme.borderRadius.lg,
+    paddingVertical: 16,
+    paddingHorizontal: 32,
+  },
+  upgradeButtonText: {
+    fontSize: 16,
+    fontWeight: "600" as const,
+    color: theme.colors.white,
+  },
+  statsCard: {
+    backgroundColor: theme.colors.white,
+    borderRadius: theme.borderRadius.lg,
+    padding: theme.spacing.lg,
+    marginBottom: theme.spacing.lg,
+    ...Platform.select({
+      ios: {
+        shadowColor: theme.colors.black,
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 8,
+      },
+      android: {
+        elevation: 2,
+      },
+    }),
+  },
+  statsTitle: {
+    fontSize: 18,
+    fontWeight: "600" as const,
+    color: theme.colors.black,
+    marginBottom: 16,
+    fontFamily: theme.typography.serif.fontFamily,
+  },
+  statsGrid: {
+    flexDirection: "row",
+    justifyContent: "space-around",
+  },
+  statItem: {
+    alignItems: "center",
+    gap: 8,
+  },
+  statValue: {
+    fontSize: 20,
+    fontWeight: "700" as const,
+    color: theme.colors.black,
+    fontFamily: theme.typography.serif.fontFamily,
+  },
+  statLabel: {
+    fontSize: 12,
+    color: theme.colors.gray[500],
+    fontWeight: "500" as const,
+  },
+  section: {
+    marginBottom: theme.spacing.xl,
+  },
+  sectionTitle: {
+    fontSize: 20,
+    fontWeight: "600" as const,
+    color: theme.colors.white,
+    marginBottom: 8,
+    fontFamily: theme.typography.serif.fontFamily,
+  },
+  sectionSubtitle: {
+    fontSize: 14,
+    color: theme.colors.gray[400],
+    marginBottom: 16,
+  },
+  tipsHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginBottom: 8,
+  },
+  milestoneProgress: {
+    marginBottom: 16,
+  },
+  milestoneBar: {
+    height: 8,
+    backgroundColor: theme.colors.gray[800],
+    borderRadius: 4,
+    marginBottom: 8,
+  },
+  milestoneBarFill: {
+    height: "100%",
+    backgroundColor: "#10B981",
+    borderRadius: 4,
+  },
+  milestoneText: {
+    fontSize: 12,
+    color: theme.colors.gray[400],
+    textAlign: "center",
+  },
+  sponsorCard: {
+    backgroundColor: theme.colors.white,
+    borderRadius: theme.borderRadius.lg,
+    padding: theme.spacing.md,
+    marginBottom: theme.spacing.md,
+    position: "relative",
+    ...Platform.select({
+      ios: {
+        shadowColor: theme.colors.black,
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 8,
+      },
+      android: {
+        elevation: 2,
+      },
+    }),
+  },
+  sponsorCardLocked: {
+    opacity: 0.6,
+  },
+  lockOverlay: {
+    position: "absolute",
+    top: 12,
+    right: 12,
+    zIndex: 1,
+  },
+  sponsorHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 12,
+  },
+  sponsorLogo: {
+    width: 48,
+    height: 48,
+    borderRadius: 8,
+    marginRight: 12,
+  },
+  sponsorInfo: {
+    flex: 1,
+  },
+  sponsorName: {
+    fontSize: 16,
+    fontWeight: "600" as const,
+    color: theme.colors.black,
+    marginBottom: 2,
+  },
+  sponsorCategory: {
+    fontSize: 12,
+    color: theme.colors.gray[500],
+  },
+  matchScoreContainer: {
+    alignItems: "center",
+  },
+  matchScore: {
+    fontSize: 18,
+    fontWeight: "700" as const,
+    color: "#10B981",
+    fontFamily: theme.typography.serif.fontFamily,
+  },
+  matchLabel: {
+    fontSize: 10,
+    color: theme.colors.gray[500],
+  },
+  sponsorDescription: {
+    fontSize: 14,
+    color: theme.colors.gray[600],
+    lineHeight: 20,
+    marginBottom: 12,
+  },
+  sponsorBudget: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 12,
+  },
+  budgetLabel: {
+    fontSize: 14,
+    color: theme.colors.gray[500],
+    marginRight: 8,
+  },
+  budgetAmount: {
+    fontSize: 14,
+    fontWeight: "600" as const,
+    color: "#10B981",
+  },
+  requirementsContainer: {
+    marginBottom: 12,
+  },
+  requirementsTitle: {
+    fontSize: 12,
+    fontWeight: "600" as const,
+    color: theme.colors.gray[700],
+    marginBottom: 8,
+  },
+  requirementsList: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 12,
+  },
+  requirementItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+  },
+  requirementText: {
+    fontSize: 12,
+  },
+  requirementMet: {
+    color: "#10B981",
+    fontWeight: "500" as const,
+  },
+  requirementNotMet: {
+    color: "#EF4444",
+    fontWeight: "500" as const,
+  },
+  sponsorFooter: {
+    flexDirection: "row",
+    justifyContent: "flex-end",
+  },
+  statusBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  statusText: {
+    fontSize: 12,
+    fontWeight: "500" as const,
+  },
+  tipCard: {
+    backgroundColor: theme.colors.white,
+    borderRadius: theme.borderRadius.md,
+    padding: theme.spacing.md,
+    marginBottom: theme.spacing.sm,
+    ...Platform.select({
+      ios: {
+        shadowColor: theme.colors.black,
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.05,
+        shadowRadius: 4,
+      },
+      android: {
+        elevation: 1,
+      },
+    }),
+  },
+  tipHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  tipIcon: {
+    fontSize: 24,
+    marginRight: 12,
+  },
+  tipInfo: {
+    flex: 1,
+  },
+  tipTitle: {
+    fontSize: 14,
+    fontWeight: "600" as const,
+    color: theme.colors.black,
+    marginBottom: 2,
+  },
+  tipDescription: {
+    fontSize: 12,
+    color: theme.colors.gray[600],
+  },
+  tipImpact: {
+    fontSize: 12,
+    fontWeight: "600" as const,
+    color: "#10B981",
+  },
+});
