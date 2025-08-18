@@ -20,6 +20,10 @@ import { getTraceLogsProcedure, addTraceLogProcedure, getTraceLogsSummaryProcedu
 import { getAdsProcedure, trackAdImpressionProcedure, trackAdClickProcedure, getAdStatsProcedure, updateAdSettingsProcedure, getPaywallContentProcedure } from "./routes/ads/route";
 import { fameScoreProcedure, fameScoreHistoryProcedure } from "./routes/fame-score/route";
 import { sendNotificationProcedure, scheduleNotificationProcedure, getNotificationHistoryProcedure, sendFameProgressNotificationProcedure } from "./routes/notifications/route";
+import { badgesProcedure, streakProcedure } from "./routes/badges/route";
+import { weeklyChallengesProcedure, updateChallengeProcedure, claimBonusProcedure } from "./routes/challenges/route";
+import { createOnboardingProcedure, getOnboardingProcedure } from "./routes/onboarding/route";
+import { sponsorHubProcedure } from "./routes/sponsors/route";
 
 export const appRouter = createTRPCRouter({
   example: createTRPCRouter({
@@ -114,6 +118,22 @@ export const appRouter = createTRPCRouter({
     schedule: scheduleNotificationProcedure,
     history: getNotificationHistoryProcedure,
     sendFameProgress: sendFameProgressNotificationProcedure,
+  }),
+  badges: createTRPCRouter({
+    list: badgesProcedure,
+    streak: streakProcedure,
+  }),
+  challenges: createTRPCRouter({
+    weekly: weeklyChallengesProcedure,
+    update: updateChallengeProcedure,
+    claimBonus: claimBonusProcedure,
+  }),
+  onboarding: createTRPCRouter({
+    create: createOnboardingProcedure,
+    get: getOnboardingProcedure,
+  }),
+  sponsors: createTRPCRouter({
+    hub: sponsorHubProcedure,
   }),
 });
 

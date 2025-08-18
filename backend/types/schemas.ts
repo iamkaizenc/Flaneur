@@ -175,6 +175,72 @@ export const UserSchema = z.object({
 
 export type User = z.infer<typeof UserSchema>;
 
+// Badge schema
+export const BadgeSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  description: z.string(),
+  icon: z.string(),
+  threshold: z.number(),
+  type: z.enum(["likes", "reach", "comments", "streak", "posts", "engagement"]),
+  createdAt: z.date(),
+});
+
+export type Badge = z.infer<typeof BadgeSchema>;
+
+// User badge schema
+export const UserBadgeSchema = z.object({
+  id: z.string(),
+  userId: z.string(),
+  badgeId: z.string(),
+  awardedAt: z.date(),
+  progress: z.number().optional(),
+});
+
+export type UserBadge = z.infer<typeof UserBadgeSchema>;
+
+// Streak schema
+export const StreakSchema = z.object({
+  id: z.string(),
+  userId: z.string(),
+  currentStreak: z.number().default(0),
+  longestStreak: z.number().default(0),
+  lastPostDate: z.date().optional(),
+  updatedAt: z.date(),
+});
+
+export type Streak = z.infer<typeof StreakSchema>;
+
+// Onboarding profile schema
+export const OnboardingProfileSchema = z.object({
+  id: z.string(),
+  userId: z.string(),
+  persona: z.enum(["Creator", "Fitness", "Tech", "Lifestyle"]),
+  goal: z.enum(["Para", "Tanınırlık", "Topluluk"]),
+  completedAt: z.date(),
+});
+
+export type OnboardingProfile = z.infer<typeof OnboardingProfileSchema>;
+
+// Weekly challenge schema
+export const WeeklyChallengeSchema = z.object({
+  id: z.string(),
+  userId: z.string(),
+  weekStart: z.date(),
+  targetPosts: z.number().default(3),
+  targetReels: z.number().default(1),
+  targetLive: z.number().default(0),
+  currentPosts: z.number().default(0),
+  currentReels: z.number().default(0),
+  currentLive: z.number().default(0),
+  completed: z.boolean().default(false),
+  bonusAwarded: z.boolean().default(false),
+  createdAt: z.date(),
+  updatedAt: z.date(),
+});
+
+export type WeeklyChallenge = z.infer<typeof WeeklyChallengeSchema>;
+
 // API Error types
 export class AuthError extends Error {
   constructor(message: string, public platform?: Platform) {

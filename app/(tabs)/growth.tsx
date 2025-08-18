@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   Platform,
   Dimensions,
+  FlatList,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { 
@@ -21,6 +22,10 @@ import {
   Lightbulb,
   ChevronRight,
   Star,
+  Award,
+  Flame,
+  Target,
+  Gift,
 } from "lucide-react-native";
 import { useAIMarketer } from "@/providers/AIMarketerProvider";
 import { theme, brandName } from "@/constants/theme";
@@ -40,6 +45,28 @@ interface InsightCardProps {
   title: string;
   description: string;
   action?: string;
+}
+
+interface BadgeCardProps {
+  name: string;
+  icon: string;
+  progress: number;
+  completed: boolean;
+  description: string;
+}
+
+interface WeeklyChallengeCardProps {
+  challenge: {
+    progress: {
+      posts: { current: number; target: number; percentage: number };
+      reels: { current: number; target: number; percentage: number };
+      live: { current: number; target: number; percentage: number };
+      overall: number;
+    };
+    isCompleted: boolean;
+    canClaimBonus: boolean;
+    daysLeft: number;
+  };
 }
 
 const MetricCard: React.FC<MetricCardProps> = ({ title, value, change, icon }) => (
@@ -178,10 +205,91 @@ const FameScoreTrend = ({ trend }: { trend: Array<{ date: string; score: number 
   );
 };
 
+const BadgeCard: React.FC<BadgeCardProps> = ({ name, icon, progress, completed, description }) => (
+  <View style={[styles.badgeCard, completed && styles.badgeCardCompleted]}>
+    <View style={styles.badgeIconContainer}>
+      <Text style={styles.badgeIcon}>{icon}</Text>
+      {completed && (
+        <View style={styles.badgeCompletedIndicator}>
+          <Text style={styles.badgeCompletedText}>✓</Text>
+        </View>
+      )}
+    </View>
+    <Text style={styles.badgeName} numberOfLines={2}>{name}</Text>
+    <View style={styles.badgeProgressContainer}>
+      <View style={styles.badgeProgressBackground}>
+        <View style={[styles.badgeProgressFill, { width: `${progress}%` }]} />
+      </View>
+      <Text style={styles.badgeProgressText}>{progress}%</Text>
+    </View>
+  </View>
+);
+
+const WeeklyChallengeCard: React.FC<WeeklyChallengeCardProps> = ({ challenge }) => {
+  const claimBonusMutation = trpc.challenges.claimBonus.useMutation();
+
+  const handleClaimBonus = () => {
+    claimBonusMutation.mutate({ userId: "user-1" });
+  };
+
+  return (
+    <View style={styles.challengeCard}>
+      <View style={styles.challengeHeader}>
+        <View style={styles.challengeIconContainer}>
+          <Target size={20} color="#3B82F6" />
+        </View>
+        <View style={styles.challengeInfo}>
+          <Text style={styles.challengeTitle}>Haftalık Challenge</Text>
+          <Text style={styles.challengeSubtitle}>{challenge.daysLeft} gün kaldı</Text>
+        </View>
+        <Text style={styles.challengeProgress}>{challenge.progress.overall}%</Text>
+      </View>
+      
+      <View style={styles.challengeProgressBars}>
+        <View style={styles.challengeProgressItem}>
+          <Text style={styles.challengeProgressLabel}>Posts: {challenge.progress.posts.current}/{challenge.progress.posts.target}</Text>
+          <View style={styles.challengeProgressBarBackground}>
+            <View style={[styles.challengeProgressBarFill, { width: `${challenge.progress.posts.percentage}%` }]} />
+          </View>
+        </View>
+        
+        {challenge.progress.reels.target > 0 && (
+          <View style={styles.challengeProgressItem}>
+            <Text style={styles.challengeProgressLabel}>Reels: {challenge.progress.reels.current}/{challenge.progress.reels.target}</Text>
+            <View style={styles.challengeProgressBarBackground}>
+              <View style={[styles.challengeProgressBarFill, { width: `${challenge.progress.reels.percentage}%` }]} />
+            </View>
+          </View>
+        )}
+      </View>
+
+      {challenge.canClaimBonus && (
+        <TouchableOpacity 
+          style={styles.claimBonusButton} 
+          onPress={handleClaimBonus}
+          disabled={claimBonusMutation.isLoading}
+        >
+          <Gift size={16} color={theme.colors.white} />
+          <Text style={styles.claimBonusText}>Bonus Al (+5 FameScore)</Text>
+        </TouchableOpacity>
+      )}
+      
+      {challenge.isCompleted && !challenge.canClaimBonus && (
+        <View style={styles.challengeCompletedBadge}>
+          <Text style={styles.challengeCompletedText}>🎉 Tamamlandı!</Text>
+        </View>
+      )}
+    </View>
+  );
+};
+
 export default function GrowthScreen() {
   const { metrics } = useAIMarketer();
   const insightsQuery = trpc.insights.list.useQuery({ range: "7d" });
   const fameScoreQuery = trpc.fameScore.get.useQuery({ userId: "user-1" });
+  const badgesQuery = trpc.badges.list.useQuery({ userId: "user-1" });
+  const streakQuery = trpc.badges.streak.useQuery({ userId: "user-1" });
+  const challengeQuery = trpc.challenges.weekly.useQuery({ userId: "user-1" });
 
   return (
     <SafeAreaView style={styles.container}>
@@ -231,6 +339,56 @@ export default function GrowthScreen() {
           </View>
         )}
 
+        {/* Badges Section */}
+        {badgesQuery.data && (
+          <View style={styles.badgesSection}>
+            <View style={styles.sectionHeader}>
+              <Award size={20} color={theme.colors.white} />
+              <Text style={styles.sectionTitle}>Başarılar</Text>
+              <Text style={styles.badgeCount}>
+                {badgesQuery.data.completedCount}/{badgesQuery.data.totalBadges}
+              </Text>
+            </View>
+            <FlatList
+              horizontal
+              data={badgesQuery.data.badges}
+              keyExtractor={(item) => item.badgeId}
+              renderItem={({ item }) => (
+                <BadgeCard
+                  name={item.name}
+                  icon={item.icon}
+                  progress={item.progress}
+                  completed={item.completed}
+                  description={item.description}
+                />
+              )}
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.badgesList}
+            />
+          </View>
+        )}
+
+        {/* Streak Section */}
+        {streakQuery.data && (
+          <View style={styles.streakCard}>
+            <View style={styles.streakHeader}>
+              <View style={styles.streakIconContainer}>
+                <Flame size={24} color="#F59E0B" />
+              </View>
+              <View style={styles.streakInfo}>
+                <Text style={styles.streakTitle}>Streak</Text>
+                <Text style={styles.streakSubtitle}>{streakQuery.data.motivationText}</Text>
+              </View>
+              <Text style={styles.streakValue}>{streakQuery.data.streak.currentStreak}</Text>
+            </View>
+          </View>
+        )}
+
+        {/* Weekly Challenge */}
+        {challengeQuery.data && (
+          <WeeklyChallengeCard challenge={challengeQuery.data} />
+        )}
+
         <View style={styles.chartCard}>
           <View style={styles.chartHeader}>
             <TrendingUp size={24} color={theme.colors.black} />
@@ -255,14 +413,13 @@ export default function GrowthScreen() {
         </View>
 
         <View style={styles.summaryCard}>
-          <Text style={styles.summaryTitle}>Performance Summary</Text>
+          <Text style={styles.summaryTitle}>Ünlüleşme Özeti</Text>
           <Text style={styles.summaryText}>
-            Your Flâneur autonomous agent has demonstrated sophisticated performance this week. 
-            Engagement metrics elevated by 24% while maintaining steady follower acquisition at 12%. 
-            The system has refined optimal distribution windows and adapted strategy with precision.
+            Bu hafta sahne performansın harika! Etkileşim oranın %24 arttı ve takipçi kazanımın istikrarlı şekilde %12 seviyesinde. 
+            Flâneur ajanın optimal paylaşım zamanlarını belirledi ve stratejini hassas şekilde ayarladı.
           </Text>
           <TouchableOpacity style={styles.detailsButton}>
-            <Text style={styles.detailsButtonText}>View Detailed Report</Text>
+            <Text style={styles.detailsButtonText}>Detaylı Raporu Gör</Text>
           </TouchableOpacity>
         </View>
       </ScrollView>
@@ -646,5 +803,243 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.gray[400],
     borderRadius: 1,
     width: "70%",
+  },
+  badgesSection: {
+    marginBottom: theme.spacing.lg,
+  },
+  sectionHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 16,
+    gap: 8,
+  },
+  badgeCount: {
+    fontSize: 14,
+    color: theme.colors.gray[400],
+    marginLeft: "auto",
+  },
+  badgesList: {
+    paddingHorizontal: 4,
+    gap: 12,
+  },
+  badgeCard: {
+    backgroundColor: theme.colors.white,
+    borderRadius: theme.borderRadius.lg,
+    padding: 16,
+    width: 120,
+    alignItems: "center",
+    ...Platform.select({
+      ios: {
+        shadowColor: theme.colors.black,
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
+      },
+      android: {
+        elevation: 2,
+      },
+    }),
+  },
+  badgeCardCompleted: {
+    borderWidth: 2,
+    borderColor: "#10B981",
+  },
+  badgeIconContainer: {
+    position: "relative",
+    marginBottom: 8,
+  },
+  badgeIcon: {
+    fontSize: 32,
+    textAlign: "center",
+  },
+  badgeCompletedIndicator: {
+    position: "absolute",
+    top: -4,
+    right: -4,
+    backgroundColor: "#10B981",
+    borderRadius: 10,
+    width: 20,
+    height: 20,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  badgeCompletedText: {
+    color: theme.colors.white,
+    fontSize: 12,
+    fontWeight: "bold" as const,
+  },
+  badgeName: {
+    fontSize: 12,
+    fontWeight: "600" as const,
+    color: theme.colors.black,
+    textAlign: "center",
+    marginBottom: 8,
+    minHeight: 32,
+  },
+  badgeProgressContainer: {
+    width: "100%",
+    alignItems: "center",
+  },
+  badgeProgressBackground: {
+    width: "100%",
+    height: 4,
+    backgroundColor: theme.colors.gray[200],
+    borderRadius: 2,
+    marginBottom: 4,
+  },
+  badgeProgressFill: {
+    height: "100%",
+    backgroundColor: "#3B82F6",
+    borderRadius: 2,
+  },
+  badgeProgressText: {
+    fontSize: 10,
+    color: theme.colors.gray[500],
+    fontWeight: "500" as const,
+  },
+  streakCard: {
+    backgroundColor: theme.colors.white,
+    borderRadius: theme.borderRadius.lg,
+    padding: theme.spacing.md,
+    marginBottom: theme.spacing.lg,
+    ...Platform.select({
+      ios: {
+        shadowColor: theme.colors.black,
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
+      },
+      android: {
+        elevation: 2,
+      },
+    }),
+  },
+  streakHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  streakIconContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "#FEF3C7",
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: 12,
+  },
+  streakInfo: {
+    flex: 1,
+  },
+  streakTitle: {
+    fontSize: 16,
+    fontWeight: "600" as const,
+    color: theme.colors.black,
+    marginBottom: 2,
+  },
+  streakSubtitle: {
+    fontSize: 12,
+    color: theme.colors.gray[600],
+  },
+  streakValue: {
+    fontSize: 24,
+    fontWeight: "700" as const,
+    color: "#F59E0B",
+    fontFamily: theme.typography.serif.fontFamily,
+  },
+  challengeCard: {
+    backgroundColor: theme.colors.white,
+    borderRadius: theme.borderRadius.lg,
+    padding: theme.spacing.md,
+    marginBottom: theme.spacing.lg,
+    ...Platform.select({
+      ios: {
+        shadowColor: theme.colors.black,
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
+      },
+      android: {
+        elevation: 2,
+      },
+    }),
+  },
+  challengeHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 16,
+  },
+  challengeIconContainer: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    backgroundColor: "#DBEAFE",
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: 12,
+  },
+  challengeInfo: {
+    flex: 1,
+  },
+  challengeTitle: {
+    fontSize: 16,
+    fontWeight: "600" as const,
+    color: theme.colors.black,
+    marginBottom: 2,
+  },
+  challengeSubtitle: {
+    fontSize: 12,
+    color: theme.colors.gray[600],
+  },
+  challengeProgress: {
+    fontSize: 18,
+    fontWeight: "700" as const,
+    color: "#3B82F6",
+  },
+  challengeProgressBars: {
+    gap: 12,
+    marginBottom: 16,
+  },
+  challengeProgressItem: {
+    gap: 4,
+  },
+  challengeProgressLabel: {
+    fontSize: 12,
+    color: theme.colors.gray[600],
+    fontWeight: "500" as const,
+  },
+  challengeProgressBarBackground: {
+    height: 6,
+    backgroundColor: theme.colors.gray[200],
+    borderRadius: 3,
+  },
+  challengeProgressBarFill: {
+    height: "100%",
+    backgroundColor: "#3B82F6",
+    borderRadius: 3,
+  },
+  claimBonusButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#10B981",
+    borderRadius: theme.borderRadius.md,
+    paddingVertical: 12,
+    gap: 8,
+  },
+  claimBonusText: {
+    fontSize: 14,
+    fontWeight: "600" as const,
+    color: theme.colors.white,
+  },
+  challengeCompletedBadge: {
+    backgroundColor: "#D1FAE5",
+    borderRadius: theme.borderRadius.md,
+    paddingVertical: 8,
+    alignItems: "center",
+  },
+  challengeCompletedText: {
+    fontSize: 14,
+    fontWeight: "600" as const,
+    color: "#10B981",
   },
 });
