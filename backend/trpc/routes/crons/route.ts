@@ -1,4 +1,5 @@
 import { publicProcedure } from "../../create-context";
+import { FameScoreService } from "../../../services/fame-score";
 
 // Mock metrics data for demonstration
 const mockMetrics = [
@@ -133,6 +134,7 @@ export const cronDailyRollupProcedure = publicProcedure
     const startTime = Date.now();
     let processedAccounts = 0;
     let anomaliesDetected = 0;
+    let fameNotificationsSent = 0;
     
     try {
       // Process daily metrics rollup
@@ -177,6 +179,31 @@ export const cronDailyRollupProcedure = publicProcedure
           console.log(`[Cron] Anomaly detected for ${metric.accountId}: ${pctChange.toFixed(1)}%`);
         }
         
+        // Calculate FameScore and check for progress notifications
+        const engagementRate = (metric.engagements / metric.impressions) * 100;
+        const followerGrowth = ((metric.followers - historicalAvg.followers) / historicalAvg.followers) * 100;
+        
+        const currentFameScore = FameScoreService.calculateFameScore({
+          engagementRate,
+          postFrequency: metric.posts * 7, // Convert daily to weekly
+          followerGrowth
+        });
+        
+        // Simulate previous week's score
+        const previousFameScore = Math.max(0, currentFameScore.score - Math.floor(Math.random() * 20));
+        
+        if (FameScoreService.shouldSendProgressNotification(currentFameScore.score, previousFameScore)) {
+          console.log(`[Cron] Sending fame progress notification: ${previousFameScore} -> ${currentFameScore.score}`);
+          fameNotificationsSent++;
+          
+          // In production, this would call the notification service
+          // await notificationService.send({
+          //   userId: "user_1",
+          //   title: "🔥 Ünlüleşme Skorun Yükseldi!",
+          //   body: FameScoreService.getProgressNotificationText(currentFameScore.score)
+          // });
+        }
+        
         processedAccounts++;
       }
       
@@ -188,6 +215,7 @@ export const cronDailyRollupProcedure = publicProcedure
         stats: {
           processedAccounts,
           anomaliesDetected,
+          fameNotificationsSent,
           duration,
           timestamp: new Date().toISOString()
         }

@@ -132,6 +132,20 @@ export const MetricsDailySchema = z.object({
 
 export type MetricsDaily = z.infer<typeof MetricsDailySchema>;
 
+// User metrics schema (includes FameScore)
+export const UserMetricsSchema = z.object({
+  id: z.string(),
+  userId: z.string(),
+  date: z.date(),
+  fameScore: z.number().min(0).max(100),
+  engagementRate: z.number().min(0).max(100),
+  postFrequency: z.number().min(0),
+  followerGrowth: z.number(),
+  createdAt: z.date(),
+});
+
+export type UserMetrics = z.infer<typeof UserMetricsSchema>;
+
 // Insights schema
 export const InsightSchema = z.object({
   id: z.string(),

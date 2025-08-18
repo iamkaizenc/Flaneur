@@ -18,6 +18,8 @@ import { generateIdempotencyKeyProcedure, checkIdempotencyProcedure, storeIdempo
 import { getPostingWindowProcedure, updatePostingWindowProcedure, isWithinPostingWindowProcedure, getOptimalPostingTimesProcedure, batchConvertTimezoneProcedure } from "./routes/timezones/route";
 import { getTraceLogsProcedure, addTraceLogProcedure, getTraceLogsSummaryProcedure, getSystemTraceLogsProcedure, clearOldTraceLogsProcedure } from "./routes/traces/route";
 import { getAdsProcedure, trackAdImpressionProcedure, trackAdClickProcedure, getAdStatsProcedure, updateAdSettingsProcedure, getPaywallContentProcedure } from "./routes/ads/route";
+import { fameScoreProcedure, fameScoreHistoryProcedure } from "./routes/fame-score/route";
+import { sendNotificationProcedure, scheduleNotificationProcedure, getNotificationHistoryProcedure, sendFameProgressNotificationProcedure } from "./routes/notifications/route";
 
 export const appRouter = createTRPCRouter({
   example: createTRPCRouter({
@@ -102,6 +104,16 @@ export const appRouter = createTRPCRouter({
     stats: getAdStatsProcedure,
     updateSettings: updateAdSettingsProcedure,
     getPaywall: getPaywallContentProcedure,
+  }),
+  fameScore: createTRPCRouter({
+    get: fameScoreProcedure,
+    history: fameScoreHistoryProcedure,
+  }),
+  notifications: createTRPCRouter({
+    send: sendNotificationProcedure,
+    schedule: scheduleNotificationProcedure,
+    history: getNotificationHistoryProcedure,
+    sendFameProgress: sendFameProgressNotificationProcedure,
   }),
 });
 

@@ -20,6 +20,7 @@ import {
   AlertTriangle,
   Lightbulb,
   ChevronRight,
+  Star,
 } from "lucide-react-native";
 import { useAIMarketer } from "@/providers/AIMarketerProvider";
 import { theme, brandName } from "@/constants/theme";
@@ -109,9 +110,78 @@ const SimpleChart = ({ data }: { data: number[] }) => {
   );
 };
 
+const FameScoreBar = ({ score, tier }: { score: number; tier: string }) => {
+  const getBarColor = (score: number) => {
+    if (score >= 86) return '#10B981'; // Yıldız - Green
+    if (score >= 61) return '#F59E0B'; // Parlıyor - Amber
+    if (score >= 31) return '#3B82F6'; // Yükselişte - Blue
+    return '#6B7280'; // Yeni Başlangıç - Gray
+  };
+
+  return (
+    <View style={styles.fameScoreContainer}>
+      <View style={styles.fameScoreHeader}>
+        <View style={styles.fameScoreIconContainer}>
+          <Star size={20} color={getBarColor(score)} />
+        </View>
+        <View style={styles.fameScoreInfo}>
+          <Text style={styles.fameScoreTitle}>Ünlüleşme Skoru</Text>
+          <Text style={styles.fameScoreTier}>{tier}</Text>
+        </View>
+        <Text style={styles.fameScoreValue}>{score}</Text>
+      </View>
+      <View style={styles.fameScoreBarContainer}>
+        <View style={styles.fameScoreBarBackground}>
+          <View 
+            style={[
+              styles.fameScoreBarFill, 
+              { 
+                width: `${score}%`, 
+                backgroundColor: getBarColor(score) 
+              }
+            ]} 
+          />
+        </View>
+        <View style={styles.fameScoreLabels}>
+          <Text style={styles.fameScoreLabel}>0</Text>
+          <Text style={styles.fameScoreLabel}>30</Text>
+          <Text style={styles.fameScoreLabel}>60</Text>
+          <Text style={styles.fameScoreLabel}>85</Text>
+          <Text style={styles.fameScoreLabel}>100</Text>
+        </View>
+      </View>
+    </View>
+  );
+};
+
+const FameScoreTrend = ({ trend }: { trend: Array<{ date: string; score: number }> }) => {
+  if (!trend || trend.length === 0) return null;
+
+  const maxScore = Math.max(...trend.map(t => t.score));
+  const minScore = Math.min(...trend.map(t => t.score));
+  const range = maxScore - minScore;
+
+  return (
+    <View style={styles.fameScoreTrendContainer}>
+      <Text style={styles.fameScoreTrendTitle}>Son 7 Gün Trendi</Text>
+      <View style={styles.fameScoreTrendChart}>
+        {trend.map((item, index) => {
+          const height = range > 0 ? ((item.score - minScore) / range) * 40 + 5 : 22;
+          return (
+            <View key={index} style={styles.fameScoreTrendBarContainer}>
+              <View style={[styles.fameScoreTrendBar, { height }]} />
+            </View>
+          );
+        })}
+      </View>
+    </View>
+  );
+};
+
 export default function GrowthScreen() {
   const { metrics } = useAIMarketer();
   const insightsQuery = trpc.insights.list.useQuery({ range: "7d" });
+  const fameScoreQuery = trpc.fameScore.get.useQuery({ userId: "user-1" });
 
   return (
     <SafeAreaView style={styles.container}>
@@ -150,6 +220,16 @@ export default function GrowthScreen() {
             icon={<MessageCircle size={20} color={theme.colors.gray[600]} />}
           />
         </View>
+
+        {fameScoreQuery.data?.hasData && (
+          <View style={styles.fameScoreCard}>
+            <FameScoreBar 
+              score={fameScoreQuery.data.score} 
+              tier={fameScoreQuery.data.tier} 
+            />
+            <FameScoreTrend trend={fameScoreQuery.data.trend} />
+          </View>
+        )}
 
         <View style={styles.chartCard}>
           <View style={styles.chartHeader}>
@@ -461,5 +541,110 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: "600" as const,
     color: theme.colors.white,
+  },
+  fameScoreCard: {
+    backgroundColor: theme.colors.white,
+    borderRadius: theme.borderRadius.xl,
+    padding: theme.spacing.lg,
+    marginBottom: theme.spacing.lg,
+    ...Platform.select({
+      ios: {
+        shadowColor: theme.colors.black,
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 8,
+      },
+      android: {
+        elevation: 2,
+      },
+    }),
+  },
+  fameScoreContainer: {
+    marginBottom: 20,
+  },
+  fameScoreHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 16,
+  },
+  fameScoreIconContainer: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    backgroundColor: theme.colors.gray[100],
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: 12,
+  },
+  fameScoreInfo: {
+    flex: 1,
+  },
+  fameScoreTitle: {
+    fontSize: 16,
+    fontWeight: "600" as const,
+    color: theme.colors.black,
+    marginBottom: 2,
+  },
+  fameScoreTier: {
+    fontSize: 12,
+    color: theme.colors.gray[500],
+    fontWeight: "500" as const,
+  },
+  fameScoreValue: {
+    fontSize: 24,
+    fontWeight: "700" as const,
+    color: theme.colors.black,
+    fontFamily: theme.typography.serif.fontFamily,
+  },
+  fameScoreBarContainer: {
+    marginBottom: 12,
+  },
+  fameScoreBarBackground: {
+    height: 8,
+    backgroundColor: theme.colors.gray[200],
+    borderRadius: 4,
+    overflow: "hidden",
+    marginBottom: 8,
+  },
+  fameScoreBarFill: {
+    height: "100%",
+    borderRadius: 4,
+  },
+  fameScoreLabels: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    paddingHorizontal: 2,
+  },
+  fameScoreLabel: {
+    fontSize: 10,
+    color: theme.colors.gray[400],
+    fontWeight: "500" as const,
+  },
+  fameScoreTrendContainer: {
+    borderTopWidth: 1,
+    borderTopColor: theme.colors.gray[200],
+    paddingTop: 16,
+  },
+  fameScoreTrendTitle: {
+    fontSize: 14,
+    fontWeight: "500" as const,
+    color: theme.colors.gray[600],
+    marginBottom: 12,
+  },
+  fameScoreTrendChart: {
+    flexDirection: "row",
+    alignItems: "flex-end",
+    height: 50,
+    gap: 3,
+  },
+  fameScoreTrendBarContainer: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "flex-end",
+  },
+  fameScoreTrendBar: {
+    backgroundColor: theme.colors.gray[400],
+    borderRadius: 1,
+    width: "70%",
   },
 });
