@@ -1,0 +1,24 @@
+{
+  "brand": "Flâneur",
+  "tagline": "Autonomous Social Media Agency",
+  "actions": {
+    "connect": "Connect",
+    "disconnect": "Disconnect",
+    "fix": "Fix",
+    "save": "Save",
+    "change_language": "Change language"
+  },
+  "risk": {
+    "healthy": "👍 Healthy visibility",
+    "down": "⚠️ Visibility is decreasing",
+    "advice": {
+      "reduce_freq": "Reduce posting frequency",
+      "change_time": "Try different posting hours",
+      "diversify": "Diversify content format"
+    }
+  },
+  "settings": {
+    "language": "Language",
+    "sandbox": "Sandbox mode"
+  }
+}

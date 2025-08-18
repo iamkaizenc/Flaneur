@@ -49,10 +49,24 @@
         {
           "photosPermission": "The app accesses your photos to let you share them with your friends."
         }
-      ]
+      ],
+      "expo-localization"
     ],
     "experiments": {
       "typedRoutes": true
-    }
+    },
+    "updates": {
+      "enabled": true,
+      "url": "<UNKNOWN>",
+      "requestHeaders": {},
+      "checkAutomatically": "ALWAYS",
+      "fallbackToCacheTimeout": 0,
+      "useEmbeddedUpdate": true,
+      "codeSigningCertificate": "<UNKNOWN>",
+      "codeSigningMetadata": "<UNKNOWN>",
+      "assetPatternsToBeBundled": [],
+      "disableAntiBrickingMeasures": false
+    },
+    "runtimeVersion": "<UNKNOWN>"
   }
 }

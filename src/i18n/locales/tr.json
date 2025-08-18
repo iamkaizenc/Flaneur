@@ -1,0 +1,24 @@
+{
+  "brand": "Flâneur",
+  "tagline": "Otonom Sosyal Medya Ajansı",
+  "actions": {
+    "connect": "Bağla",
+    "disconnect": "Bağı Kes",
+    "fix": "Düzelt",
+    "save": "Kaydet",
+    "change_language": "Dili değiştir"
+  },
+  "risk": {
+    "healthy": "👍 Sağlıklı görünürlük",
+    "down": "⚠️ Görünürlük düşüyor",
+    "advice": {
+      "reduce_freq": "Frekansı azalt",
+      "change_time": "Gönderim saatini değiştir",
+      "diversify": "Formatı çeşitlendir"
+    }
+  },
+  "settings": {
+    "language": "Dil",
+    "sandbox": "Sandbox modu"
+  }
+}

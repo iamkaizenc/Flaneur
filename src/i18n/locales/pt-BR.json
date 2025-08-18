@@ -1,0 +1,24 @@
+{
+  "brand": "Flâneur",
+  "tagline": "Agência Autônoma de Mídias Sociais",
+  "actions": {
+    "connect": "Conectar",
+    "disconnect": "Desconectar",
+    "fix": "Corrigir",
+    "save": "Salvar",
+    "change_language": "Mudar idioma"
+  },
+  "risk": {
+    "healthy": "👍 Visibilidade saudável",
+    "down": "⚠️ Queda de visibilidade",
+    "advice": {
+      "reduce_freq": "Reduza a frequência de posts",
+      "change_time": "Altere os horários de postagem",
+      "diversify": "Diversifique o formato do conteúdo"
+    }
+  },
+  "settings": {
+    "language": "Idioma",
+    "sandbox": "Modo Sandbox"
+  }
+}

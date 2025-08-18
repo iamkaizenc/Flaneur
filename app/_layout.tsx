@@ -3,6 +3,9 @@ import { Stack } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import React, { useEffect } from "react";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
+import { I18nextProvider } from 'react-i18next';
+import i18n from '../src/i18n';
+import { LanguageProvider } from '../src/providers/LanguageProvider';
 import { AIMarketerProvider } from "@/providers/AIMarketerProvider";
 import { trpc, trpcClient } from "@/lib/trpc";
 
@@ -33,14 +36,18 @@ export default function RootLayout() {
   }, []);
 
   return (
-    <trpc.Provider client={trpcClient} queryClient={queryClient}>
-      <QueryClientProvider client={queryClient}>
-        <GestureHandlerRootView style={{ flex: 1 }}>
-          <AIMarketerProvider>
-            <RootLayoutNav />
-          </AIMarketerProvider>
-        </GestureHandlerRootView>
-      </QueryClientProvider>
-    </trpc.Provider>
+    <I18nextProvider i18n={i18n}>
+      <LanguageProvider>
+        <trpc.Provider client={trpcClient} queryClient={queryClient}>
+          <QueryClientProvider client={queryClient}>
+            <GestureHandlerRootView style={{ flex: 1 }}>
+              <AIMarketerProvider>
+                <RootLayoutNav />
+              </AIMarketerProvider>
+            </GestureHandlerRootView>
+          </QueryClientProvider>
+        </trpc.Provider>
+      </LanguageProvider>
+    </I18nextProvider>
   );
 }

@@ -52,6 +52,7 @@ import {
 import { theme, brandName } from "@/constants/theme";
 import { trpc } from "@/lib/trpc";
 import { usePurchase } from "@/hooks/usePurchase";
+import { LanguagePicker } from "../../src/components/LanguagePicker";
 
 interface SectionHeaderProps {
   title: string;
@@ -1084,6 +1085,9 @@ export default function SettingsScreen() {
             subtitle="Visual appearance"
             value={settingsQuery.data?.branding.theme || "black-white"}
           />
+          <View style={styles.languageSection}>
+            <LanguagePicker />
+          </View>
         </View>
 
         {/* Developer Section */}
@@ -2062,5 +2066,10 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: "500" as const,
     color: theme.colors.white,
+  },
+  languageSection: {
+    padding: theme.spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: theme.colors.gray[100],
   },
 });

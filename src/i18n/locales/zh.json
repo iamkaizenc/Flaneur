@@ -1,0 +1,24 @@
+{
+  "brand": "Flâneur",
+  "tagline": "自驱动社交媒体机构",
+  "actions": {
+    "connect": "连接",
+    "disconnect": "断开",
+    "fix": "修复",
+    "save": "保存",
+    "change_language": "切换语言"
+  },
+  "risk": {
+    "healthy": "👍 可见度良好",
+    "down": "⚠️ 可见度下降",
+    "advice": {
+      "reduce_freq": "降低发布频率",
+      "change_time": "尝试不同发布时间",
+      "diversify": "丰富内容形式"
+    }
+  },
+  "settings": {
+    "language": "语言",
+    "sandbox": "沙盒模式"
+  }
+}

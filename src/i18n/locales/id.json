@@ -1,0 +1,24 @@
+{
+  "brand": "Flâneur",
+  "tagline": "Agensi Media Sosial Otonom",
+  "actions": {
+    "connect": "Hubungkan",
+    "disconnect": "Putuskan",
+    "fix": "Perbaiki",
+    "save": "Simpan",
+    "change_language": "Ganti bahasa"
+  },
+  "risk": {
+    "healthy": "👍 Visibilitas sehat",
+    "down": "⚠️ Visibilitas menurun",
+    "advice": {
+      "reduce_freq": "Kurangi frekuensi posting",
+      "change_time": "Ubah jam posting",
+      "diversify": "Beragamkan format konten"
+    }
+  },
+  "settings": {
+    "language": "Bahasa",
+    "sandbox": "Mode Sandbox"
+  }
+}
