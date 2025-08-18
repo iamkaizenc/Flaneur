@@ -23,7 +23,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useAIMarketer } from "@/providers/AIMarketerProvider";
 import { theme, brandName } from "@/constants/theme";
-import { Logo } from "@/components/Logo";
+import { BrandLogo } from "@/components/Logo";
 
 type ContentStatus = "draft" | "queued" | "published" | "held";
 
@@ -84,7 +84,9 @@ export default function FlowScreen() {
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
         <View style={styles.headerContent}>
-          <Logo size="medium" style={styles.headerLogo} />
+          <View style={styles.logoContainer}>
+            <BrandLogo size="sm" />
+          </View>
           <View style={styles.headerText}>
             <Text style={styles.brandTagline}>Otonom Sosyal Medya Ajansı</Text>
           </View>
@@ -197,7 +199,9 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
   },
-  headerLogo: {
+  logoContainer: {
+    alignItems: "center",
+    paddingVertical: 8,
     marginRight: theme.spacing.md,
   },
   headerText: {
