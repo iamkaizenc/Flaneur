@@ -83,13 +83,11 @@ export default function FlowScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
-        <View style={styles.headerContent}>
-          <View style={styles.logoContainer}>
-            <BrandLogo size="sm" />
-          </View>
-          <View style={styles.headerText}>
-            <Text style={styles.brandTagline}>Otonom Sosyal Medya Ajansı</Text>
-          </View>
+        <View style={styles.headerBranding}>
+          <BrandLogo size="md" />
+          <Text style={styles.headerTagline}>
+            Otonom Sosyal Medya Ajansı
+          </Text>
         </View>
       </View>
       <ScrollView
@@ -195,30 +193,16 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: theme.colors.gray[800],
   },
-  headerContent: {
-    flexDirection: "row",
+  headerBranding: {
     alignItems: "center",
+    justifyContent: "center",
   },
-  logoContainer: {
-    alignItems: "center",
-    paddingVertical: 8,
-    marginRight: theme.spacing.md,
-  },
-  headerText: {
-    flex: 1,
-  },
-  brandName: {
-    fontSize: 28,
-    fontWeight: "700" as const,
-    color: theme.colors.white,
-    fontFamily: theme.typography.serif.fontFamily,
-    marginBottom: 4,
-    letterSpacing: 1,
-  },
-  brandTagline: {
-    fontSize: 14,
-    color: theme.colors.gray[400],
-    fontFamily: theme.typography.sansSerif.fontFamily,
+  headerTagline: {
+    fontSize: 12,
+    color: "#999",
+    marginTop: 4,
+    fontFamily: "Inter-Regular",
+    textAlign: "center",
   },
   currentStatusCard: {
     borderRadius: theme.borderRadius.xl,

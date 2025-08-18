@@ -429,10 +429,12 @@ export default function GrowthScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
-        <View style={styles.logoContainer}>
+        <View style={styles.headerBranding}>
           <BrandLogo size="md" />
+          <Text style={styles.headerTagline}>
+            Otonom Sosyal Medya Ajansı
+          </Text>
         </View>
-        <Text style={styles.brandTagline}>Growth Analytics</Text>
       </View>
 
       <ScrollView
@@ -593,19 +595,15 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: theme.colors.gray[800],
   },
-  logoContainer: {
+  headerBranding: {
     alignItems: "center",
-    paddingVertical: 8,
-    marginBottom: 8,
+    justifyContent: "center",
   },
-  logo: {
-    width: 120,
-    height: 120,
-  },
-  brandTagline: {
-    fontSize: 14,
-    color: theme.colors.gray[400],
-    fontFamily: theme.typography.sansSerif.fontFamily,
+  headerTagline: {
+    fontSize: 12,
+    color: "#999",
+    marginTop: 4,
+    fontFamily: "Inter-Regular",
     textAlign: "center",
   },
   metricsGrid: {
