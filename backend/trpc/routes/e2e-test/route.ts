@@ -23,8 +23,8 @@ const mockTestData = {
   },
   bannedPost: {
     id: "e2e_banned_post", 
-    title: "Revolutionary Test Content",
-    body: "This revolutionary content should be held due to banned words for testing purposes.",
+    title: "Test Content with Banned Word",
+    body: "This content contains the word 'bedava' which should trigger guardrails for testing purposes.",
     platform: "linkedin" as const,
     scheduledAt: new Date().toISOString()
   },
@@ -141,7 +141,7 @@ export const e2ePublishPostsProcedure = publicProcedure
         publishedPosts.push(safePostResult);
       }
       
-      // Test 2: Queue banned post -> should be held
+      // Test 2: Queue banned post (contains "revolutionary") -> should be held
       console.log("[E2E] Testing banned word guardrail...");
       const bannedPostResult = await simulatePublish(mockTestData.bannedPost);
       
@@ -623,8 +623,50 @@ export const e2eFullFlowProcedure = publicProcedure
 
 // Helper functions for simulation
 async function simulatePublish(post: any) {
-  // Simulate publishing with guardrails
-  const bannedWords = ['revolutionary', 'disruptive', 'game-changer'];
+  console.log(`[E2E] Simulating publish for ${post.platform}: ${post.title}`);
+  
+  // Step 1: Plan Gates Check
+  const userPlan = "premium"; // Mock user plan
+  const planGateResult = checkPlanGates(userPlan, post.platform);
+  if (!planGateResult.allowed) {
+    return {
+      success: false,
+      status: 'held',
+      reason: planGateResult.reason,
+      friendlyReason: planGateResult.friendlyReason,
+      contentId: post.id,
+      platform: post.platform
+    };
+  }
+  
+  // Step 2: Posting Window Check
+  const windowResult = checkPostingWindow();
+  if (!windowResult.allowed) {
+    return {
+      success: false,
+      status: 'held',
+      reason: windowResult.reason,
+      friendlyReason: windowResult.friendlyReason,
+      contentId: post.id,
+      platform: post.platform
+    };
+  }
+  
+  // Step 3: Daily Quota Check
+  const quotaResult = checkDailyQuota(post.platform);
+  if (!quotaResult.allowed) {
+    return {
+      success: false,
+      status: 'held',
+      reason: quotaResult.reason,
+      friendlyReason: quotaResult.friendlyReason,
+      contentId: post.id,
+      platform: post.platform
+    };
+  }
+  
+  // Step 4: Banned Words Guardrail
+  const bannedWords = ['revolutionary', 'disruptive', 'game-changer', 'bedava'];
   const content = `${post.title} ${post.body}`.toLowerCase();
   
   for (const word of bannedWords) {
@@ -635,19 +677,128 @@ async function simulatePublish(post: any) {
         reason: `Content contains banned word: '${word}'`,
         friendlyReason: `"${word}" kelimesi markalar tarafından sevilmiyor 🚫`,
         contentId: post.id,
-        platform: post.platform
+        platform: post.platform,
+        guardrailType: 'banned_word'
       };
     }
   }
   
-  // Simulate successful publish
+  // Step 5: Simulate successful publish
+  const publishedId = `pub_${Date.now()}_${post.platform}`;
+  console.log(`[E2E] Successfully published: ${publishedId}`);
+  
   return {
     success: true,
     status: 'published',
-    publishedId: `pub_${Date.now()}`,
+    publishedId,
     contentId: post.id,
     platform: post.platform,
-    publishedAt: new Date().toISOString()
+    publishedAt: new Date().toISOString(),
+    trace: {
+      planGate: planGateResult,
+      postingWindow: windowResult,
+      dailyQuota: quotaResult,
+      guardrails: 'passed'
+    }
+  };
+}
+
+// Plan Gates Check
+function checkPlanGates(userPlan: string, platform: string) {
+  const planRules = {
+    free: {
+      allowed: ['manual'],
+      description: 'Free users can only publish manually'
+    },
+    premium: {
+      allowed: ['manual', 'analytics'],
+      description: 'Premium users get analytics but no automation'
+    },
+    platinum: {
+      allowed: ['manual', 'analytics', 'automation'],
+      description: 'Platinum users get full automation'
+    }
+  };
+  
+  const currentPlan = planRules[userPlan as keyof typeof planRules] || planRules.free;
+  const isAutomationRequest = true; // Simulate automation request
+  
+  if (isAutomationRequest && !currentPlan.allowed.includes('automation')) {
+    return {
+      allowed: false,
+      reason: `Plan ${userPlan} does not allow automation`,
+      friendlyReason: `Otomatik paylaşım için Platinum'a yükselt 🚀`,
+      planRequired: 'platinum'
+    };
+  }
+  
+  return {
+    allowed: true,
+    plan: userPlan,
+    permissions: currentPlan.allowed
+  };
+}
+
+// Posting Window Check (08:00-22:00 workspace TZ)
+function checkPostingWindow() {
+  const now = new Date();
+  const hour = now.getHours();
+  const workspaceTimezone = 'Europe/Istanbul'; // Mock workspace timezone
+  
+  // Convert to workspace timezone (simplified for demo)
+  const workspaceHour = (hour + 3) % 24; // Istanbul is UTC+3
+  
+  const windowStart = 8; // 08:00
+  const windowEnd = 22;  // 22:00
+  
+  if (workspaceHour < windowStart || workspaceHour >= windowEnd) {
+    return {
+      allowed: false,
+      reason: `Outside posting window: ${workspaceHour}:00 (allowed: ${windowStart}:00-${windowEnd}:00)`,
+      friendlyReason: `Şu an sahne kapalı (${windowStart}:00-${windowEnd}:00 arası yayına çıkar) ⏰`,
+      currentHour: workspaceHour,
+      windowStart,
+      windowEnd
+    };
+  }
+  
+  return {
+    allowed: true,
+    currentHour: workspaceHour,
+    windowStart,
+    windowEnd,
+    timezone: workspaceTimezone
+  };
+}
+
+// Daily Quota Check
+function checkDailyQuota(platform: string) {
+  const dailyQuotas = {
+    x: { limit: 5, used: 2 },
+    instagram: { limit: 2, used: 1 },
+    linkedin: { limit: 1, used: 0 },
+    facebook: { limit: 2, used: 1 },
+    telegram: { limit: 999, used: 0 }, // Unlimited
+    tiktok: { limit: 1, used: 0 }
+  };
+  
+  const quota = dailyQuotas[platform as keyof typeof dailyQuotas] || { limit: 1, used: 0 };
+  
+  if (quota.used >= quota.limit) {
+    return {
+      allowed: false,
+      reason: `Daily quota exceeded for ${platform}: ${quota.used}/${quota.limit}`,
+      friendlyReason: `Bugünkü ${platform} kotası doldu (${quota.used}/${quota.limit}) 📊`,
+      quota: quota.limit,
+      used: quota.used
+    };
+  }
+  
+  return {
+    allowed: true,
+    quota: quota.limit,
+    used: quota.used,
+    remaining: quota.limit - quota.used
   };
 }
 

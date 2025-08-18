@@ -193,7 +193,7 @@ export default function E2ETestScreen() {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Test Controls</Text>
           <Text style={styles.sectionDescription}>
-            Run end-to-end tests to verify platform connections, publishing, idempotency, growth updates, and cron jobs.
+            Run end-to-end tests to verify platform connections, publishing with plan gates, posting windows, daily quotas, guardrails, idempotency, growth updates, and cron jobs.
           </Text>
           
           <View style={styles.buttonContainer}>
@@ -310,16 +310,36 @@ export default function E2ETestScreen() {
               <Text style={styles.coverageText}>Content Publishing & Guardrails</Text>
             </View>
             <View style={styles.coverageItem}>
+              <Text style={styles.coverageIcon}>🛡️</Text>
+              <Text style={styles.coverageText}>Plan Gates (Free/Premium/Platinum)</Text>
+            </View>
+            <View style={styles.coverageItem}>
+              <Text style={styles.coverageIcon}>⏰</Text>
+              <Text style={styles.coverageText}>Posting Window (08:00-22:00 TZ)</Text>
+            </View>
+            <View style={styles.coverageItem}>
+              <Text style={styles.coverageIcon}>📊</Text>
+              <Text style={styles.coverageText}>Daily Quotas (X:5, IG:2, LI:1, FB:2, TG:∞)</Text>
+            </View>
+            <View style={styles.coverageItem}>
+              <Text style={styles.coverageIcon}>🚫</Text>
+              <Text style={styles.coverageText}>Banned Words (&quot;bedava&quot;, &quot;revolutionary&quot;)</Text>
+            </View>
+            <View style={styles.coverageItem}>
               <Text style={styles.coverageIcon}>🔄</Text>
               <Text style={styles.coverageText}>Idempotency & Duplicate Prevention</Text>
             </View>
             <View style={styles.coverageItem}>
               <Text style={styles.coverageIcon}>📈</Text>
-              <Text style={styles.coverageText}>Growth Updates & FameScore</Text>
+              <Text style={styles.coverageText}>Growth Updates & FameScore (+10 Push)</Text>
             </View>
             <View style={styles.coverageItem}>
               <Text style={styles.coverageIcon}>🏆</Text>
               <Text style={styles.coverageText}>Badge & Streak Cron Jobs</Text>
+            </View>
+            <View style={styles.coverageItem}>
+              <Text style={styles.coverageIcon}>📋</Text>
+              <Text style={styles.coverageText}>Trace Logs (queued → publishing → success/held)</Text>
             </View>
           </View>
         </View>
