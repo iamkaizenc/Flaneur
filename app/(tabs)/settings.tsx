@@ -43,6 +43,11 @@ import {
   Settings,
   Wifi,
   WifiOff,
+  TrendingUp,
+  Activity,
+  BarChart3,
+  Plus,
+  Minus,
 } from "lucide-react-native";
 import { theme, brandName } from "@/constants/theme";
 import { trpc } from "@/lib/trpc";
@@ -283,6 +288,135 @@ const ConnectPlatformCard: React.FC<{ platform: string; onConnect: () => void; i
   );
 };
 
+const RiskCenterSection: React.FC = () => {
+  const riskStatusQuery = trpc.risk.getStatus.useQuery({ range: "7d" });
+  const riskSimulateMutation = trpc.risk.simulateAlert.useMutation();
+  const [riskNotificationsEnabled, setRiskNotificationsEnabled] = useState(true);
+
+  const handleSimulateAlert = async () => {
+    try {
+      const result = await riskSimulateMutation.mutateAsync();
+      riskStatusQuery.refetch();
+      Alert.alert("Demo Alert", "Risk uyarısı oluşturuldu (demo)");
+    } catch (error) {
+      Alert.alert("Error", "Demo alert oluşturulamadı");
+    }
+  };
+
+  if (!riskStatusQuery.data) {
+    return (
+      <View style={styles.riskCenterLoading}>
+        <Text style={styles.riskCenterLoadingText}>Risk durumu yükleniyor...</Text>
+      </View>
+    );
+  }
+
+  const { shadowban, healthScore, quotas, alerts } = riskStatusQuery.data;
+  const isHealthy = !shadowban.detected && shadowban.riskLevel === "low";
+
+  return (
+    <View style={styles.riskCenterContainer}>
+      {/* Health Status */}
+      <View style={[styles.riskHealthCard, { backgroundColor: isHealthy ? "#D1FAE5" : "#FEE2E2" }]}>
+        <View style={styles.riskHealthHeader}>
+          <View style={[styles.riskHealthIcon, { backgroundColor: isHealthy ? "#10B981" : "#EF4444" }]}>
+            {isHealthy ? (
+              <CheckCircle size={16} color={theme.colors.white} />
+            ) : (
+              <AlertCircle size={16} color={theme.colors.white} />
+            )}
+          </View>
+          <View style={styles.riskHealthInfo}>
+            <Text style={[styles.riskHealthTitle, { color: isHealthy ? "#10B981" : "#EF4444" }]}>
+              {isHealthy ? "Sağlıklı Durum" : "Risk Tespit Edildi"}
+            </Text>
+            <Text style={styles.riskHealthSubtitle}>
+              Sağlık Skoru: {healthScore}/100
+            </Text>
+          </View>
+        </View>
+        {shadowban.reason && (
+          <Text style={styles.riskHealthReason}>{shadowban.reason}</Text>
+        )}
+      </View>
+
+      {/* Platform Quotas */}
+      <View style={styles.riskQuotasSection}>
+        <Text style={styles.riskSectionTitle}>Günlük Kotalar</Text>
+        {Object.entries(quotas).map(([platform, quota]) => (
+          <View key={platform} style={styles.quotaItem}>
+            <Text style={styles.quotaPlatform}>{platform.toUpperCase()}</Text>
+            <View style={styles.quotaBar}>
+              <View style={styles.quotaBarBackground}>
+                <View 
+                  style={[
+                    styles.quotaBarFill, 
+                    { width: `${Math.min((quota.daily / quota.daily) * 100, 100)}%` }
+                  ]} 
+                />
+              </View>
+              <Text style={styles.quotaText}>{quota.daily} günlük</Text>
+            </View>
+          </View>
+        ))}
+      </View>
+
+      {/* Recent Alerts */}
+      {alerts && alerts.length > 0 && (
+        <View style={styles.riskAlertsSection}>
+          <Text style={styles.riskSectionTitle}>Son Uyarılar</Text>
+          {alerts.slice(0, 3).map((alert, index) => (
+            <View key={alert.id || index} style={styles.alertItem}>
+              <View style={[styles.alertSeverity, { backgroundColor: 
+                alert.severity === "high" ? "#EF4444" : 
+                alert.severity === "medium" ? "#F59E0B" : "#10B981"
+              }]} />
+              <View style={styles.alertContent}>
+                <Text style={styles.alertMessage}>{alert.message}</Text>
+                <Text style={styles.alertTime}>
+                  {new Date(alert.createdAt).toLocaleDateString('tr-TR', {
+                    month: 'short',
+                    day: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit'
+                  })}
+                </Text>
+              </View>
+            </View>
+          ))}
+        </View>
+      )}
+
+      {/* Controls */}
+      <View style={styles.riskControlsSection}>
+        <View style={styles.switchItem}>
+          <View style={styles.switchContent}>
+            <Text style={styles.switchTitle}>Risk Bildirimleri</Text>
+            <Text style={styles.switchSubtitle}>Otomatik uyarıları etkinleştir</Text>
+          </View>
+          <Switch
+            value={riskNotificationsEnabled}
+            onValueChange={setRiskNotificationsEnabled}
+            trackColor={{ false: theme.colors.gray[300], true: theme.colors.black }}
+            thumbColor={theme.colors.white}
+          />
+        </View>
+        
+        <TouchableOpacity 
+          style={styles.simulateButton} 
+          onPress={handleSimulateAlert}
+          disabled={riskSimulateMutation.isPending}
+        >
+          <Activity size={16} color={theme.colors.white} />
+          <Text style={styles.simulateButtonText}>
+            {riskSimulateMutation.isPending ? "Oluşturuluyor..." : "Demo Uyarı Oluştur"}
+          </Text>
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
+};
+
 export default function SettingsScreen() {
   const [dryRunEnabled, setDryRunEnabled] = useState(true);
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
@@ -304,6 +438,8 @@ export default function SettingsScreen() {
   const oauthFixMutation = trpc.oauth.fix.useMutation();
   const oauthRevokeMutation = trpc.oauth.revoke.useMutation();
   const oauthAccountsQuery = trpc.oauth.listAccounts.useQuery();
+  const riskStatusQuery = trpc.risk.getStatus.useQuery({ range: "7d" });
+  const riskSimulateMutation = trpc.risk.simulateAlert.useMutation();
   
   const authMeQuery = trpc.auth.me.useQuery();
   const authLogoutMutation = trpc.auth.logout.useMutation();
@@ -612,6 +748,16 @@ export default function SettingsScreen() {
     }
   };
 
+  const handleSimulateRiskAlert = async () => {
+    try {
+      const result = await riskSimulateMutation.mutateAsync();
+      riskStatusQuery.refetch();
+      Alert.alert("Demo Alert Created", result.message);
+    } catch (error) {
+      Alert.alert("Error", "Failed to create demo alert");
+    }
+  };
+
   const openProfileModal = () => {
     setProfileForm({
       displayName: authMeQuery.data?.user?.displayName || "",
@@ -863,6 +1009,12 @@ export default function SettingsScreen() {
               thumbColor={theme.colors.white}
             />
           </View>
+        </View>
+
+        {/* Risk Center Section */}
+        <SectionHeader title="Risk Merkezi" icon={<Shield size={20} color={theme.colors.white} />} />
+        <View style={styles.section}>
+          <RiskCenterSection />
         </View>
 
         {/* Guardrails Section */}
@@ -1769,5 +1921,146 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.black,
     alignItems: "center",
     justifyContent: "center",
+  },
+  riskCenterContainer: {
+    gap: 16,
+  },
+  riskCenterLoading: {
+    padding: theme.spacing.lg,
+    alignItems: "center",
+  },
+  riskCenterLoadingText: {
+    fontSize: 14,
+    color: theme.colors.gray[500],
+  },
+  riskHealthCard: {
+    padding: theme.spacing.md,
+    borderRadius: theme.borderRadius.md,
+    borderWidth: 1,
+    borderColor: theme.colors.gray[200],
+  },
+  riskHealthHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 8,
+  },
+  riskHealthIcon: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: 8,
+  },
+  riskHealthInfo: {
+    flex: 1,
+  },
+  riskHealthTitle: {
+    fontSize: 14,
+    fontWeight: "600" as const,
+    marginBottom: 2,
+  },
+  riskHealthSubtitle: {
+    fontSize: 12,
+    color: theme.colors.gray[600],
+  },
+  riskHealthReason: {
+    fontSize: 12,
+    color: theme.colors.gray[700],
+    fontStyle: "italic",
+  },
+  riskQuotasSection: {
+    borderTopWidth: 1,
+    borderTopColor: theme.colors.gray[100],
+    paddingTop: 12,
+  },
+  riskSectionTitle: {
+    fontSize: 14,
+    fontWeight: "600" as const,
+    color: theme.colors.black,
+    marginBottom: 8,
+  },
+  quotaItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 8,
+  },
+  quotaPlatform: {
+    fontSize: 12,
+    fontWeight: "500" as const,
+    color: theme.colors.gray[600],
+    width: 60,
+  },
+  quotaBar: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  quotaBarBackground: {
+    flex: 1,
+    height: 4,
+    backgroundColor: theme.colors.gray[200],
+    borderRadius: 2,
+  },
+  quotaBarFill: {
+    height: "100%",
+    backgroundColor: "#3B82F6",
+    borderRadius: 2,
+  },
+  quotaText: {
+    fontSize: 10,
+    color: theme.colors.gray[500],
+    width: 50,
+  },
+  riskAlertsSection: {
+    borderTopWidth: 1,
+    borderTopColor: theme.colors.gray[100],
+    paddingTop: 12,
+  },
+  alertItem: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    marginBottom: 8,
+    gap: 8,
+  },
+  alertSeverity: {
+    width: 4,
+    height: 32,
+    borderRadius: 2,
+    marginTop: 2,
+  },
+  alertContent: {
+    flex: 1,
+  },
+  alertMessage: {
+    fontSize: 12,
+    color: theme.colors.black,
+    marginBottom: 2,
+  },
+  alertTime: {
+    fontSize: 10,
+    color: theme.colors.gray[500],
+  },
+  riskControlsSection: {
+    borderTopWidth: 1,
+    borderTopColor: theme.colors.gray[100],
+    paddingTop: 12,
+    gap: 12,
+  },
+  simulateButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#F59E0B",
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: theme.borderRadius.md,
+    gap: 6,
+  },
+  simulateButtonText: {
+    fontSize: 12,
+    fontWeight: "500" as const,
+    color: theme.colors.white,
   },
 });

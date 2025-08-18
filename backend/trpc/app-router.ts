@@ -32,6 +32,13 @@ import {
   e2eBadgeStreakCronProcedure, 
   e2eFullFlowProcedure 
 } from "./routes/e2e-test/route";
+import { 
+  riskGetStatusProcedure, 
+  riskCheckContentProcedure, 
+  riskCreateAlertProcedure, 
+  riskResolveAlertProcedure, 
+  riskSimulateAlertProcedure 
+} from "./routes/risk/route";
 
 export const appRouter = createTRPCRouter({
   example: createTRPCRouter({
@@ -150,6 +157,13 @@ export const appRouter = createTRPCRouter({
     growthUpdates: e2eGrowthUpdatesProcedure,
     badgeStreakCron: e2eBadgeStreakCronProcedure,
     fullFlow: e2eFullFlowProcedure,
+  }),
+  risk: createTRPCRouter({
+    getStatus: riskGetStatusProcedure,
+    checkContent: riskCheckContentProcedure,
+    createAlert: riskCreateAlertProcedure,
+    resolveAlert: riskResolveAlertProcedure,
+    simulateAlert: riskSimulateAlertProcedure,
   }),
 });
 

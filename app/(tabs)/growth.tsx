@@ -26,6 +26,9 @@ import {
   Flame,
   Target,
   Gift,
+  Shield,
+  CheckCircle,
+  Settings,
 } from "lucide-react-native";
 import { useAIMarketer } from "@/providers/AIMarketerProvider";
 import { theme, brandName } from "@/constants/theme";
@@ -67,6 +70,19 @@ interface WeeklyChallengeCardProps {
     canClaimBonus: boolean;
     daysLeft: number;
   };
+}
+
+interface RiskMonitorCardProps {
+  riskStatus: {
+    shadowban: {
+      detected: boolean;
+      riskLevel: "low" | "medium" | "high";
+      reason?: string;
+    };
+    healthScore: number;
+    recommendations: string[];
+  };
+  onOpenRiskCenter: () => void;
 }
 
 const MetricCard: React.FC<MetricCardProps> = ({ title, value, change, icon }) => (
@@ -225,6 +241,57 @@ const BadgeCard: React.FC<BadgeCardProps> = ({ name, icon, progress, completed, 
   </View>
 );
 
+const RiskMonitorCard: React.FC<RiskMonitorCardProps> = ({ riskStatus, onOpenRiskCenter }) => {
+  const isHealthy = !riskStatus.shadowban.detected && riskStatus.shadowban.riskLevel === "low";
+  const cardColor = isHealthy ? "#10B981" : "#EF4444";
+  const bgColor = isHealthy ? "#D1FAE5" : "#FEE2E2";
+  
+  return (
+    <TouchableOpacity style={[styles.riskCard, { backgroundColor: bgColor }]} onPress={onOpenRiskCenter} activeOpacity={0.7}>
+      <View style={styles.riskHeader}>
+        <View style={[styles.riskIconContainer, { backgroundColor: cardColor + "20" }]}>
+          {isHealthy ? (
+            <CheckCircle size={20} color={cardColor} />
+          ) : (
+            <AlertTriangle size={20} color={cardColor} />
+          )}
+        </View>
+        <View style={styles.riskInfo}>
+          <Text style={[styles.riskTitle, { color: cardColor }]}>
+            {isHealthy ? "👍 Sağlıklı görünürlük" : "⚠️ Görünürlük düşüyor"}
+          </Text>
+          <Text style={styles.riskSubtitle}>
+            {isHealthy 
+              ? "Son 7 günde stabil performans" 
+              : riskStatus.shadowban.reason || "Risk tespit edildi"
+            }
+          </Text>
+        </View>
+        <View style={styles.riskScore}>
+          <Text style={[styles.riskScoreText, { color: cardColor }]}>{riskStatus.healthScore}</Text>
+        </View>
+      </View>
+      
+      {!isHealthy && riskStatus.recommendations.length > 0 && (
+        <View style={styles.riskRecommendations}>
+          <Text style={styles.riskRecommendationsTitle}>Öneriler:</Text>
+          {riskStatus.recommendations.slice(0, 3).map((rec, index) => (
+            <View key={index} style={styles.riskRecommendationItem}>
+              <Text style={styles.riskRecommendationBullet}>•</Text>
+              <Text style={styles.riskRecommendationText}>{rec}</Text>
+            </View>
+          ))}
+        </View>
+      )}
+      
+      <View style={styles.riskAction}>
+        <Text style={styles.riskActionText}>Risk Merkezi</Text>
+        <ChevronRight size={16} color={theme.colors.gray[400]} />
+      </View>
+    </TouchableOpacity>
+  );
+};
+
 const WeeklyChallengeCard: React.FC<WeeklyChallengeCardProps> = ({ challenge }) => {
   const claimBonusMutation = trpc.challenges.claimBonus.useMutation();
 
@@ -267,7 +334,7 @@ const WeeklyChallengeCard: React.FC<WeeklyChallengeCardProps> = ({ challenge }) 
         <TouchableOpacity 
           style={styles.claimBonusButton} 
           onPress={handleClaimBonus}
-          disabled={claimBonusMutation.isLoading}
+          disabled={claimBonusMutation.isPending}
         >
           <Gift size={16} color={theme.colors.white} />
           <Text style={styles.claimBonusText}>Bonus Al (+5 FameScore)</Text>
@@ -290,6 +357,12 @@ export default function GrowthScreen() {
   const badgesQuery = trpc.badges.list.useQuery({ userId: "user-1" });
   const streakQuery = trpc.badges.streak.useQuery({ userId: "user-1" });
   const challengeQuery = trpc.challenges.weekly.useQuery({ userId: "user-1" });
+  const riskStatusQuery = trpc.risk.getStatus.useQuery({ range: "7d" });
+  
+  const handleOpenRiskCenter = () => {
+    console.log('[Growth] Opening Risk Center');
+    // Navigate to Risk Center in Settings
+  };
 
   return (
     <SafeAreaView style={styles.container}>
@@ -382,6 +455,14 @@ export default function GrowthScreen() {
               <Text style={styles.streakValue}>{streakQuery.data.streak.currentStreak}</Text>
             </View>
           </View>
+        )}
+
+        {/* Risk Monitor Card */}
+        {riskStatusQuery.data && (
+          <RiskMonitorCard 
+            riskStatus={riskStatusQuery.data} 
+            onOpenRiskCenter={handleOpenRiskCenter}
+          />
         )}
 
         {/* Weekly Challenge */}
@@ -1041,5 +1122,94 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: "600" as const,
     color: "#10B981",
+  },
+  riskCard: {
+    borderRadius: theme.borderRadius.lg,
+    padding: theme.spacing.md,
+    marginBottom: theme.spacing.lg,
+    ...Platform.select({
+      ios: {
+        shadowColor: theme.colors.black,
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
+      },
+      android: {
+        elevation: 2,
+      },
+    }),
+  },
+  riskHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 12,
+  },
+  riskIconContainer: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: 12,
+  },
+  riskInfo: {
+    flex: 1,
+  },
+  riskTitle: {
+    fontSize: 16,
+    fontWeight: "600" as const,
+    marginBottom: 2,
+  },
+  riskSubtitle: {
+    fontSize: 12,
+    color: theme.colors.gray[600],
+  },
+  riskScore: {
+    alignItems: "center",
+  },
+  riskScoreText: {
+    fontSize: 18,
+    fontWeight: "700" as const,
+    fontFamily: theme.typography.serif.fontFamily,
+  },
+  riskRecommendations: {
+    marginBottom: 12,
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: theme.colors.gray[200],
+  },
+  riskRecommendationsTitle: {
+    fontSize: 12,
+    fontWeight: "600" as const,
+    color: theme.colors.gray[700],
+    marginBottom: 6,
+  },
+  riskRecommendationItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 2,
+  },
+  riskRecommendationBullet: {
+    fontSize: 12,
+    color: theme.colors.gray[500],
+    marginRight: 6,
+  },
+  riskRecommendationText: {
+    fontSize: 12,
+    color: theme.colors.gray[600],
+    flex: 1,
+  },
+  riskAction: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: theme.colors.gray[200],
+  },
+  riskActionText: {
+    fontSize: 14,
+    fontWeight: "500" as const,
+    color: theme.colors.gray[700],
   },
 });
