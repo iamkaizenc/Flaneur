@@ -24,6 +24,14 @@ import { badgesProcedure, streakProcedure } from "./routes/badges/route";
 import { weeklyChallengesProcedure, updateChallengeProcedure, claimBonusProcedure } from "./routes/challenges/route";
 import { createOnboardingProcedure, getOnboardingProcedure } from "./routes/onboarding/route";
 import { sponsorHubProcedure } from "./routes/sponsors/route";
+import { 
+  e2eConnectPlatformsProcedure, 
+  e2ePublishPostsProcedure, 
+  e2eIdempotencyTestProcedure, 
+  e2eGrowthUpdatesProcedure, 
+  e2eBadgeStreakCronProcedure, 
+  e2eFullFlowProcedure 
+} from "./routes/e2e-test/route";
 
 export const appRouter = createTRPCRouter({
   example: createTRPCRouter({
@@ -134,6 +142,14 @@ export const appRouter = createTRPCRouter({
   }),
   sponsors: createTRPCRouter({
     hub: sponsorHubProcedure,
+  }),
+  e2e: createTRPCRouter({
+    connectPlatforms: e2eConnectPlatformsProcedure,
+    publishPosts: e2ePublishPostsProcedure,
+    idempotencyTest: e2eIdempotencyTestProcedure,
+    growthUpdates: e2eGrowthUpdatesProcedure,
+    badgeStreakCron: e2eBadgeStreakCronProcedure,
+    fullFlow: e2eFullFlowProcedure,
   }),
 });
 
