@@ -11,11 +11,35 @@
   "risk": {
     "healthy": "👍 Healthy visibility",
     "down": "⚠️ Visibility is decreasing",
+    "stable_performance": "Stable performance in the last 7 days",
+    "risk_detected": "Risk detected",
+    "recommendations": "Recommendations:",
+    "risk_center": "Risk Center",
     "advice": {
       "reduce_freq": "Reduce posting frequency",
       "change_time": "Try different posting hours",
       "diversify": "Diversify content format"
     }
+  },
+  "growth": {
+    "weekly_growth": "Weekly Growth",
+    "insights_title": "This Week's Insights",
+    "fame_summary": "Fame Summary",
+    "detailed_report": "View Detailed Report",
+    "achievements": "Achievements",
+    "weekly_challenge": "Weekly Challenge",
+    "days_left": "days left",
+    "claim_bonus": "Claim Bonus (+5 FameScore)",
+    "completed": "🎉 Completed!",
+    "fame_score": "Fame Score",
+    "last_7_days_trend": "Last 7 Days Trend",
+    "streak": "Streak",
+    "your_path": "Your Path",
+    "personalized_strategy": "Personalized strategy",
+    "why_strategy": "Why this strategy?",
+    "photo": "Photo",
+    "video": "Video",
+    "ig_posts": "IG Posts"
   },
   "settings": {
     "language": "Language",

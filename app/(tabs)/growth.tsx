@@ -30,6 +30,7 @@ import {
   CheckCircle,
   Settings,
 } from "lucide-react-native";
+import { useTranslation } from 'react-i18next';
 import { useAIMarketer } from "@/providers/AIMarketerProvider";
 import { theme, brandName } from "@/constants/theme";
 import { trpc } from "@/lib/trpc";
@@ -260,6 +261,7 @@ const BadgeCard: React.FC<BadgeCardProps> = ({ name, icon, progress, completed, 
 );
 
 const RiskMonitorCard: React.FC<RiskMonitorCardProps> = ({ riskStatus, onOpenRiskCenter }) => {
+  const { t } = useTranslation();
   const isHealthy = !riskStatus.shadowban.detected && riskStatus.shadowban.riskLevel === "low";
   const cardColor = isHealthy ? "#10B981" : "#EF4444";
   const bgColor = isHealthy ? "#D1FAE5" : "#FEE2E2";
@@ -276,12 +278,12 @@ const RiskMonitorCard: React.FC<RiskMonitorCardProps> = ({ riskStatus, onOpenRis
         </View>
         <View style={styles.riskInfo}>
           <Text style={[styles.riskTitle, { color: cardColor }]}>
-            {isHealthy ? "👍 Sağlıklı görünürlük" : "⚠️ Görünürlük düşüyor"}
+            {isHealthy ? t('risk.healthy') : t('risk.down')}
           </Text>
           <Text style={styles.riskSubtitle}>
             {isHealthy 
-              ? "Son 7 günde stabil performans" 
-              : riskStatus.shadowban.reason || "Risk tespit edildi"
+              ? t('risk.stable_performance') 
+              : riskStatus.shadowban.reason || t('risk.risk_detected')
             }
           </Text>
         </View>
@@ -292,7 +294,7 @@ const RiskMonitorCard: React.FC<RiskMonitorCardProps> = ({ riskStatus, onOpenRis
       
       {!isHealthy && riskStatus.recommendations.length > 0 && (
         <View style={styles.riskRecommendations}>
-          <Text style={styles.riskRecommendationsTitle}>Öneriler:</Text>
+          <Text style={styles.riskRecommendationsTitle}>{t('risk.recommendations')}</Text>
           {riskStatus.recommendations.slice(0, 3).map((rec, index) => (
             <View key={index} style={styles.riskRecommendationItem}>
               <Text style={styles.riskRecommendationBullet}>•</Text>
@@ -303,7 +305,7 @@ const RiskMonitorCard: React.FC<RiskMonitorCardProps> = ({ riskStatus, onOpenRis
       )}
       
       <View style={styles.riskAction}>
-        <Text style={styles.riskActionText}>Risk Merkezi</Text>
+        <Text style={styles.riskActionText}>{t('risk.risk_center')}</Text>
         <ChevronRight size={16} color={theme.colors.gray[400]} />
       </View>
     </TouchableOpacity>
@@ -412,6 +414,7 @@ const PersonaGuidanceBanner: React.FC<PersonaGuidanceBannerProps> = ({ guidance 
 );
 
 export default function GrowthScreen() {
+  const { t } = useTranslation();
   const { metrics } = useAIMarketer();
   const insightsQuery = trpc.insights.list.useQuery({ range: "7d" });
   const fameScoreQuery = trpc.fameScore.get.useQuery({ userId: "user-1" });
@@ -432,7 +435,7 @@ export default function GrowthScreen() {
         <View style={styles.headerBranding}>
           <BrandLogo size="md" />
           <Text style={styles.headerTagline}>
-            Otonom Sosyal Medya Ajansı
+            {t('tagline')}
           </Text>
         </View>
       </View>
@@ -544,13 +547,13 @@ export default function GrowthScreen() {
         <View style={styles.chartCard}>
           <View style={styles.chartHeader}>
             <TrendingUp size={24} color={theme.colors.black} />
-            <Text style={styles.chartTitle}>Weekly Growth</Text>
+            <Text style={styles.chartTitle}>{t('growth.weekly_growth')}</Text>
           </View>
           <SimpleChart data={metrics.growthData} />
         </View>
 
         <View style={styles.insightsSection}>
-          <Text style={styles.sectionTitle}>This Week's Insights</Text>
+          <Text style={styles.sectionTitle}>{t('growth.insights_title')}</Text>
           <View style={styles.insightsList}>
             {insightsQuery.data?.insights.map((insight) => (
               <InsightCard
@@ -565,13 +568,13 @@ export default function GrowthScreen() {
         </View>
 
         <View style={styles.summaryCard}>
-          <Text style={styles.summaryTitle}>Ünlüleşme Özeti</Text>
+          <Text style={styles.summaryTitle}>{t('growth.fame_summary')}</Text>
           <Text style={styles.summaryText}>
             Bu hafta sahne performansın harika! Etkileşim oranın %24 arttı ve takipçi kazanımın istikrarlı şekilde %12 seviyesinde. 
             Flâneur ajanın optimal paylaşım zamanlarını belirledi ve stratejini hassas şekilde ayarladı.
           </Text>
           <TouchableOpacity style={styles.detailsButton}>
-            <Text style={styles.detailsButtonText}>Detaylı Raporu Gör</Text>
+            <Text style={styles.detailsButtonText}>{t('growth.detailed_report')}</Text>
           </TouchableOpacity>
         </View>
       </ScrollView>

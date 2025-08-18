@@ -11,11 +11,35 @@
   "risk": {
     "healthy": "👍 Sağlıklı görünürlük",
     "down": "⚠️ Görünürlük düşüyor",
+    "stable_performance": "Son 7 günde stabil performans",
+    "risk_detected": "Risk tespit edildi",
+    "recommendations": "Öneriler:",
+    "risk_center": "Risk Merkezi",
     "advice": {
       "reduce_freq": "Frekansı azalt",
       "change_time": "Gönderim saatini değiştir",
       "diversify": "Formatı çeşitlendir"
     }
+  },
+  "growth": {
+    "weekly_growth": "Haftalık Büyüme",
+    "insights_title": "Bu Haftanın İçgörüleri",
+    "fame_summary": "Ünlüleşme Özeti",
+    "detailed_report": "Detaylı Raporu Gör",
+    "achievements": "Başarılar",
+    "weekly_challenge": "Haftalık Challenge",
+    "days_left": "gün kaldı",
+    "claim_bonus": "Bonus Al (+5 FameScore)",
+    "completed": "🎉 Tamamlandı!",
+    "fame_score": "Ünlüleşme Skoru",
+    "last_7_days_trend": "Son 7 Gün Trendi",
+    "streak": "Streak",
+    "your_path": "Senin Yolun",
+    "personalized_strategy": "Kişiselleştirilmiş strateji",
+    "why_strategy": "Neden bu strateji?",
+    "photo": "Fotoğraf",
+    "video": "Video",
+    "ig_posts": "IG Posts"
   },
   "settings": {
     "language": "Dil",
