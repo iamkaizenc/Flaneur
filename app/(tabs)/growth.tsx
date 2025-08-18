@@ -33,6 +33,7 @@ import {
 import { useAIMarketer } from "@/providers/AIMarketerProvider";
 import { theme, brandName } from "@/constants/theme";
 import { trpc } from "@/lib/trpc";
+import { Logo } from "@/components/Logo";
 
 const { width } = Dimensions.get('window');
 
@@ -428,7 +429,9 @@ export default function GrowthScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.brandName}>{brandName}</Text>
+        <View style={styles.logoContainer}>
+          <Logo size="large" variant="white" style={styles.logo} />
+        </View>
         <Text style={styles.brandTagline}>Growth Analytics</Text>
       </View>
 
@@ -590,17 +593,19 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: theme.colors.gray[800],
   },
-  brandName: {
-    fontSize: 28,
-    fontWeight: "700" as const,
-    color: theme.colors.white,
-    fontFamily: theme.typography.serif.fontFamily,
-    marginBottom: 4,
+  logoContainer: {
+    alignItems: "center",
+    marginBottom: 8,
+  },
+  logo: {
+    width: 120,
+    height: 120,
   },
   brandTagline: {
     fontSize: 14,
     color: theme.colors.gray[400],
     fontFamily: theme.typography.sansSerif.fontFamily,
+    textAlign: "center",
   },
   metricsGrid: {
     flexDirection: "row",

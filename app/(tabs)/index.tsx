@@ -84,9 +84,8 @@ export default function FlowScreen() {
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
         <View style={styles.headerContent}>
-          <Logo size="small" style={styles.headerLogo} />
+          <Logo size="medium" style={styles.headerLogo} />
           <View style={styles.headerText}>
-            <Text style={styles.brandName}>{brandName}</Text>
             <Text style={styles.brandTagline}>Otonom Sosyal Medya Ajansı</Text>
           </View>
         </View>
