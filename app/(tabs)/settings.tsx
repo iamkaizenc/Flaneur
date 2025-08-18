@@ -39,6 +39,10 @@ import {
   Mail,
   FileText,
   Globe,
+  RefreshCw,
+  Settings,
+  Wifi,
+  WifiOff,
 } from "lucide-react-native";
 import { theme, brandName } from "@/constants/theme";
 import { trpc } from "@/lib/trpc";
@@ -61,10 +65,19 @@ interface SettingItemProps {
 interface AccountCardProps {
   platform: string;
   handle: string;
-  status: "connected" | "expired";
+  status: "connected" | "expired" | "error";
   lastRefresh: string;
   onConnect: () => void;
   onDisconnect: () => void;
+  onFix?: () => void;
+  isLiveMode?: boolean;
+}
+
+interface PlatformConfig {
+  name: string;
+  icon: string;
+  color: string;
+  description: string;
 }
 
 const SectionHeader: React.FC<SectionHeaderProps> = ({ title, icon }) => (
@@ -107,47 +120,168 @@ const SettingItem: React.FC<SettingItemProps> = ({
   </TouchableOpacity>
 );
 
+const getPlatformConfig = (platform: string): PlatformConfig => {
+  const configs: Record<string, PlatformConfig> = {
+    x: {
+      name: "X (Twitter)",
+      icon: "𝕏",
+      color: "#000000",
+      description: "Connect your X account for posting tweets"
+    },
+    instagram: {
+      name: "Instagram",
+      icon: "📷",
+      color: "#E4405F",
+      description: "Share photos and stories to Instagram"
+    },
+    facebook: {
+      name: "Facebook",
+      icon: "📘",
+      color: "#1877F2",
+      description: "Post to your Facebook page"
+    },
+    linkedin: {
+      name: "LinkedIn",
+      icon: "💼",
+      color: "#0A66C2",
+      description: "Share professional content on LinkedIn"
+    },
+    tiktok: {
+      name: "TikTok",
+      icon: "🎵",
+      color: "#000000",
+      description: "Upload videos to TikTok"
+    },
+    telegram: {
+      name: "Telegram",
+      icon: "✈️",
+      color: "#0088CC",
+      description: "Send messages via Telegram bot"
+    }
+  };
+  return configs[platform] || {
+    name: platform.charAt(0).toUpperCase() + platform.slice(1),
+    icon: "🔗",
+    color: "#6B7280",
+    description: `Connect your ${platform} account`
+  };
+};
+
 const AccountCard: React.FC<AccountCardProps> = ({ 
   platform, 
   handle, 
   status, 
   lastRefresh, 
   onConnect, 
-  onDisconnect 
-}) => (
-  <View style={styles.accountCard}>
-    <View style={styles.accountHeader}>
-      <View style={styles.accountInfo}>
-        <Text style={styles.accountPlatform}>{platform}</Text>
-        <Text style={styles.accountHandle}>{handle}</Text>
-        <Text style={styles.accountRefresh}>Last refresh: {new Date(lastRefresh).toLocaleDateString()}</Text>
+  onDisconnect,
+  onFix,
+  isLiveMode = false
+}) => {
+  const config = getPlatformConfig(platform);
+  
+  return (
+    <View style={styles.accountCard}>
+      <View style={styles.accountHeader}>
+        <View style={styles.platformIconContainer}>
+          <Text style={styles.platformIcon}>{config.icon}</Text>
+          {!isLiveMode && (
+            <View style={styles.sandboxBadge}>
+              <Text style={styles.sandboxText}>Sandbox</Text>
+            </View>
+          )}
+        </View>
+        <View style={styles.accountInfo}>
+          <View style={styles.platformNameRow}>
+            <Text style={styles.accountPlatform}>{config.name}</Text>
+            <View style={[
+              styles.statusBadge, 
+              status === "connected" ? styles.statusConnected : 
+              status === "error" ? styles.statusError : styles.statusExpired
+            ]}>
+              {status === "connected" ? (
+                <Wifi size={12} color="#10B981" />
+              ) : status === "error" ? (
+                <AlertCircle size={12} color="#EF4444" />
+              ) : (
+                <WifiOff size={12} color="#F59E0B" />
+              )}
+              <Text style={[
+                styles.statusText, 
+                status === "connected" ? styles.statusTextConnected : 
+                status === "error" ? styles.statusTextError : styles.statusTextExpired
+              ]}>
+                {status === "connected" ? "Connected" : status === "error" ? "Error" : "Expired"}
+              </Text>
+            </View>
+          </View>
+          <Text style={styles.accountHandle}>{handle}</Text>
+          <Text style={styles.accountDescription}>{config.description}</Text>
+          <Text style={styles.accountRefresh}>
+            Last refresh: {new Date(lastRefresh).toLocaleDateString('en-US', {
+              month: 'short',
+              day: 'numeric',
+              hour: '2-digit',
+              minute: '2-digit'
+            })}
+          </Text>
+        </View>
       </View>
-      <View style={[styles.statusBadge, status === "connected" ? styles.statusConnected : styles.statusExpired]}>
-        {status === "connected" ? (
-          <CheckCircle size={16} color="#10B981" />
+      <View style={styles.accountActions}>
+        {status === "expired" || status === "error" ? (
+          <>
+            {onFix && (
+              <TouchableOpacity style={styles.fixButton} onPress={onFix}>
+                <RefreshCw size={14} color={theme.colors.white} />
+                <Text style={styles.fixButtonText}>Fix</Text>
+              </TouchableOpacity>
+            )}
+            <TouchableOpacity style={styles.connectButton} onPress={onConnect}>
+              <Link size={14} color={theme.colors.white} />
+              <Text style={styles.connectButtonText}>Reconnect</Text>
+            </TouchableOpacity>
+          </>
         ) : (
-          <AlertCircle size={16} color="#F59E0B" />
+          <TouchableOpacity style={styles.disconnectButton} onPress={onDisconnect}>
+            <Unlink size={14} color={theme.colors.gray[600]} />
+            <Text style={styles.disconnectButtonText}>Disconnect</Text>
+          </TouchableOpacity>
         )}
-        <Text style={[styles.statusText, status === "connected" ? styles.statusTextConnected : styles.statusTextExpired]}>
-          {status === "connected" ? "Connected" : "Expired"}
-        </Text>
       </View>
     </View>
-    <View style={styles.accountActions}>
-      {status === "expired" ? (
-        <TouchableOpacity style={styles.connectButton} onPress={onConnect}>
-          <Link size={16} color={theme.colors.white} />
-          <Text style={styles.connectButtonText}>Reconnect</Text>
-        </TouchableOpacity>
-      ) : (
-        <TouchableOpacity style={styles.disconnectButton} onPress={onDisconnect}>
-          <Unlink size={16} color={theme.colors.gray[600]} />
-          <Text style={styles.disconnectButtonText}>Disconnect</Text>
-        </TouchableOpacity>
-      )}
-    </View>
-  </View>
-);
+  );
+};
+
+const ConnectPlatformCard: React.FC<{ platform: string; onConnect: () => void; isLiveMode: boolean }> = ({ 
+  platform, 
+  onConnect, 
+  isLiveMode 
+}) => {
+  const config = getPlatformConfig(platform);
+  
+  return (
+    <TouchableOpacity style={styles.connectPlatformCard} onPress={onConnect} activeOpacity={0.7}>
+      <View style={styles.connectPlatformHeader}>
+        <View style={styles.platformIconContainer}>
+          <Text style={styles.platformIcon}>{config.icon}</Text>
+          {!isLiveMode && (
+            <View style={styles.sandboxBadge}>
+              <Text style={styles.sandboxText}>Sandbox</Text>
+            </View>
+          )}
+        </View>
+        <View style={styles.connectPlatformInfo}>
+          <Text style={styles.connectPlatformName}>{config.name}</Text>
+          <Text style={styles.connectPlatformDescription}>{config.description}</Text>
+        </View>
+        <View style={styles.connectPlatformAction}>
+          <View style={styles.connectIconContainer}>
+            <Link size={16} color={theme.colors.white} />
+          </View>
+        </View>
+      </View>
+    </TouchableOpacity>
+  );
+};
 
 export default function SettingsScreen() {
   const [dryRunEnabled, setDryRunEnabled] = useState(true);
@@ -166,6 +300,11 @@ export default function SettingsScreen() {
   const settingsDisconnectMutation = trpc.settings.disconnect.useMutation();
   const settingsTestNotificationMutation = trpc.settings.testNotification.useMutation();
   
+  const oauthStartMutation = trpc.oauth.start.useMutation();
+  const oauthFixMutation = trpc.oauth.fix.useMutation();
+  const oauthRevokeMutation = trpc.oauth.revoke.useMutation();
+  const oauthAccountsQuery = trpc.oauth.listAccounts.useQuery();
+  
   const authMeQuery = trpc.auth.me.useQuery();
   const authLogoutMutation = trpc.auth.logout.useMutation();
   const authUpdateProfileMutation = trpc.auth.updateProfile.useMutation();
@@ -178,9 +317,14 @@ export default function SettingsScreen() {
   
   const { purchasePlan, restorePurchases, isLoading: purchaseLoading } = usePurchase();
 
+  const isLiveMode = process.env.LIVE_MODE === "true";
+  const availablePlatforms = ["x", "instagram", "facebook", "linkedin", "tiktok", "telegram"];
+  
   const handleConnect = async (platform: string) => {
     try {
-      const result = await settingsConnectMutation.mutateAsync({ platform: platform.toLowerCase() as any });
+      const result = await oauthStartMutation.mutateAsync({ 
+        platform: platform as "x" | "instagram" | "linkedin" | "tiktok" | "facebook" | "telegram" 
+      });
       
       if (result.requiresBotToken) {
         Alert.alert(
@@ -190,23 +334,38 @@ export default function SettingsScreen() {
         );
       } else if (result.authUrl) {
         console.log(`[OAuth] Opening auth URL for ${platform}:`, result.authUrl);
-        Alert.alert(
-          "Connect Account",
-          `Opening OAuth flow for ${platform}. In a real app, this would open the browser.`,
-          [
-            { text: "Cancel", style: "cancel" },
-            { 
-              text: "Connect", 
-              onPress: () => {
-                // In DRY_RUN mode, simulate successful connection
-                setTimeout(() => {
-                  settingsQuery.refetch();
-                  Alert.alert("Success", `${platform} connected successfully (DRY_RUN mode)`);
-                }, 1000);
+        
+        if (isLiveMode) {
+          // In LIVE mode, open the actual OAuth URL
+          if (Platform.OS === 'web') {
+            window.open(result.authUrl, '_blank');
+          } else {
+            Alert.alert(
+              "Connect Account",
+              `Opening ${getPlatformConfig(platform).name} authorization in browser...`,
+              [{ text: "OK" }]
+            );
+          }
+        } else {
+          // In DRY_RUN mode, simulate successful connection
+          Alert.alert(
+            "Connect Account",
+            `Simulating ${getPlatformConfig(platform).name} connection (DRY_RUN mode)`,
+            [
+              { text: "Cancel", style: "cancel" },
+              { 
+                text: "Connect", 
+                onPress: () => {
+                  setTimeout(() => {
+                    oauthAccountsQuery.refetch();
+                    settingsQuery.refetch();
+                    Alert.alert("Success", `${getPlatformConfig(platform).name} connected successfully (DRY_RUN mode)`);
+                  }, 1000);
+                }
               }
-            }
-          ]
-        );
+            ]
+          );
+        }
       }
     } catch (error) {
       console.error('[OAuth] Connection error:', error);
@@ -215,11 +374,75 @@ export default function SettingsScreen() {
   };
 
   const handleDisconnect = async (platform: string) => {
+    Alert.alert(
+      "Disconnect Account",
+      `Are you sure you want to disconnect your ${getPlatformConfig(platform).name} account?`,
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Disconnect",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              await oauthRevokeMutation.mutateAsync({ platform });
+              oauthAccountsQuery.refetch();
+              settingsQuery.refetch();
+              Alert.alert("Success", `${getPlatformConfig(platform).name} disconnected successfully`);
+            } catch (error) {
+              Alert.alert("Error", "Failed to disconnect account");
+            }
+          }
+        }
+      ]
+    );
+  };
+  
+  const handleFix = async (platform: string) => {
     try {
-      await settingsDisconnectMutation.mutateAsync({ platform });
-      Alert.alert("Success", `${platform} disconnected successfully`);
+      const result = await oauthFixMutation.mutateAsync({ platform });
+      
+      if (result.requiresBotToken) {
+        Alert.alert(
+          "Telegram Setup",
+          result.message + "\n\n" + "Please update your bot token in the connection settings.",
+          [{ text: "OK" }]
+        );
+      } else if (result.authUrl) {
+        console.log(`[OAuth] Opening fix auth URL for ${platform}:`, result.authUrl);
+        
+        if (isLiveMode) {
+          if (Platform.OS === 'web') {
+            window.open(result.authUrl, '_blank');
+          } else {
+            Alert.alert(
+              "Fix Connection",
+              `Opening ${getPlatformConfig(platform).name} re-authorization in browser...`,
+              [{ text: "OK" }]
+            );
+          }
+        } else {
+          Alert.alert(
+            "Fix Connection",
+            `Simulating ${getPlatformConfig(platform).name} re-authorization (DRY_RUN mode)`,
+            [
+              { text: "Cancel", style: "cancel" },
+              { 
+                text: "Fix", 
+                onPress: () => {
+                  setTimeout(() => {
+                    oauthAccountsQuery.refetch();
+                    settingsQuery.refetch();
+                    Alert.alert("Success", `${getPlatformConfig(platform).name} connection fixed (DRY_RUN mode)`);
+                  }, 1000);
+                }
+              }
+            ]
+          );
+        }
+      }
     } catch (error) {
-      Alert.alert("Error", "Failed to disconnect account");
+      console.error('[OAuth] Fix connection error:', error);
+      Alert.alert("Error", "Failed to fix connection");
     }
   };
 
@@ -564,19 +787,45 @@ export default function SettingsScreen() {
         </View>
 
         {/* Connections Section */}
-        <SectionHeader title="Connections" icon={<Link size={20} color={theme.colors.white} />} />
+        <SectionHeader 
+          title="Connections" 
+          icon={<Link size={20} color={theme.colors.white} />} 
+        />
         <View style={styles.section}>
-          {settingsQuery.data?.accounts.map((account, index) => (
+          {!isLiveMode && (
+            <View style={styles.modeIndicator}>
+              <Settings size={16} color={"#F59E0B"} />
+              <Text style={styles.modeIndicatorText}>Sandbox Mode - Testing Environment</Text>
+            </View>
+          )}
+          
+          {/* Connected Accounts */}
+          {oauthAccountsQuery.data?.accounts.map((account, index) => (
             <AccountCard
               key={index}
               platform={account.platform}
               handle={account.handle}
               status={account.status}
-              lastRefresh={account.lastRefresh}
+              lastRefresh={account.lastRefresh || new Date().toISOString()}
               onConnect={() => handleConnect(account.platform)}
               onDisconnect={() => handleDisconnect(account.platform)}
+              onFix={() => handleFix(account.platform)}
+              isLiveMode={isLiveMode}
             />
           ))}
+          
+          {/* Available Platforms to Connect */}
+          {availablePlatforms
+            .filter(platform => !oauthAccountsQuery.data?.accounts.some(acc => acc.platform === platform))
+            .map((platform) => (
+              <ConnectPlatformCard
+                key={platform}
+                platform={platform}
+                onConnect={() => handleConnect(platform)}
+                isLiveMode={isLiveMode}
+              />
+            ))
+          }
         </View>
 
         {/* Posting Rules Section */}
@@ -1077,6 +1326,9 @@ const styles = StyleSheet.create({
   statusExpired: {
     backgroundColor: "#FEF3C7",
   },
+  statusError: {
+    backgroundColor: "#FEE2E2",
+  },
   statusText: {
     fontSize: 12,
     fontWeight: "500" as const,
@@ -1087,6 +1339,9 @@ const styles = StyleSheet.create({
   statusTextExpired: {
     color: "#F59E0B",
   },
+  statusTextError: {
+    color: "#EF4444",
+  },
   accountActions: {
     flexDirection: "row",
     gap: 8,
@@ -1095,13 +1350,13 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     backgroundColor: theme.colors.black,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 8,
-    gap: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 6,
+    gap: 4,
   },
   connectButtonText: {
-    fontSize: 14,
+    fontSize: 12,
     fontWeight: "500" as const,
     color: theme.colors.white,
   },
@@ -1412,5 +1667,107 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: "600" as const,
     color: theme.colors.white,
+  },
+  modeIndicator: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#FEF3C7",
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+    marginBottom: 12,
+    gap: 8,
+  },
+  modeIndicatorText: {
+    fontSize: 12,
+    fontWeight: "500" as const,
+    color: "#92400E",
+  },
+  platformIconContainer: {
+    position: "relative",
+    alignItems: "center",
+    justifyContent: "center",
+    width: 48,
+    height: 48,
+    marginRight: 12,
+  },
+  platformIcon: {
+    fontSize: 24,
+    textAlign: "center",
+  },
+  sandboxBadge: {
+    position: "absolute",
+    bottom: -2,
+    right: -2,
+    backgroundColor: "#F59E0B",
+    paddingHorizontal: 4,
+    paddingVertical: 1,
+    borderRadius: 6,
+  },
+  sandboxText: {
+    fontSize: 8,
+    fontWeight: "600" as const,
+    color: theme.colors.white,
+    textTransform: "uppercase",
+  },
+  platformNameRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 4,
+  },
+  accountDescription: {
+    fontSize: 12,
+    color: theme.colors.gray[500],
+    marginBottom: 4,
+  },
+  fixButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#F59E0B",
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 6,
+    gap: 4,
+    marginRight: 8,
+  },
+  fixButtonText: {
+    fontSize: 12,
+    fontWeight: "500" as const,
+    color: theme.colors.white,
+  },
+  connectPlatformCard: {
+    padding: theme.spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: theme.colors.gray[100],
+    backgroundColor: theme.colors.gray[50],
+  },
+  connectPlatformHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  connectPlatformInfo: {
+    flex: 1,
+  },
+  connectPlatformName: {
+    fontSize: 16,
+    fontWeight: "500" as const,
+    color: theme.colors.black,
+    marginBottom: 2,
+  },
+  connectPlatformDescription: {
+    fontSize: 12,
+    color: theme.colors.gray[600],
+  },
+  connectPlatformAction: {
+    marginLeft: 12,
+  },
+  connectIconContainer: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: theme.colors.black,
+    alignItems: "center",
+    justifyContent: "center",
   },
 });
