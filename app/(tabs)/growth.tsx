@@ -85,6 +85,23 @@ interface RiskMonitorCardProps {
   onOpenRiskCenter: () => void;
 }
 
+interface PersonaGuidanceBannerProps {
+  guidance: {
+    contentMix: {
+      video: number;
+      image: number;
+      text: number;
+    };
+    cadence: {
+      IG: number;
+      X: number;
+      TG: number;
+    };
+    why: string[];
+    bannerText: string;
+  };
+}
+
 const MetricCard: React.FC<MetricCardProps> = ({ title, value, change, icon }) => (
   <View style={styles.metricCard}>
     <View style={styles.metricHeader}>
@@ -350,6 +367,49 @@ const WeeklyChallengeCard: React.FC<WeeklyChallengeCardProps> = ({ challenge }) 
   );
 };
 
+const PersonaGuidanceBanner: React.FC<PersonaGuidanceBannerProps> = ({ guidance }) => (
+  <View style={styles.guidanceBanner}>
+    <View style={styles.guidanceHeader}>
+      <View style={styles.guidanceIconContainer}>
+        <Target size={20} color="#8B5CF6" />
+      </View>
+      <View style={styles.guidanceInfo}>
+        <Text style={styles.guidanceTitle}>{guidance.bannerText}</Text>
+        <Text style={styles.guidanceSubtitle}>Kişiselleştirilmiş strateji</Text>
+      </View>
+    </View>
+    
+    <View style={styles.guidanceContent}>
+      <View style={styles.guidanceStats}>
+        <View style={styles.guidanceStat}>
+          <Text style={styles.guidanceStatValue}>{guidance.contentMix.image}%</Text>
+          <Text style={styles.guidanceStatLabel}>Fotoğraf</Text>
+        </View>
+        <View style={styles.guidanceStat}>
+          <Text style={styles.guidanceStatValue}>{guidance.contentMix.video}%</Text>
+          <Text style={styles.guidanceStatLabel}>Video</Text>
+        </View>
+        <View style={styles.guidanceStat}>
+          <Text style={styles.guidanceStatValue}>{guidance.cadence.IG}/hafta</Text>
+          <Text style={styles.guidanceStatLabel}>IG Posts</Text>
+        </View>
+      </View>
+      
+      {guidance.why.length > 0 && (
+        <View style={styles.guidanceReasons}>
+          <Text style={styles.guidanceReasonsTitle}>Neden bu strateji?</Text>
+          {guidance.why.slice(0, 2).map((reason, index) => (
+            <View key={index} style={styles.guidanceReasonItem}>
+              <Text style={styles.guidanceReasonBullet}>•</Text>
+              <Text style={styles.guidanceReasonText}>{reason}</Text>
+            </View>
+          ))}
+        </View>
+      )}
+    </View>
+  </View>
+);
+
 export default function GrowthScreen() {
   const { metrics } = useAIMarketer();
   const insightsQuery = trpc.insights.list.useQuery({ range: "7d" });
@@ -358,6 +418,7 @@ export default function GrowthScreen() {
   const streakQuery = trpc.badges.streak.useQuery({ userId: "user-1" });
   const challengeQuery = trpc.challenges.weekly.useQuery({ userId: "user-1" });
   const riskStatusQuery = trpc.risk.getStatus.useQuery({ range: "7d" });
+  const onboardingQuery = trpc.onboarding.get.useQuery({ userId: "user-1" });
   
   const handleOpenRiskCenter = () => {
     console.log('[Growth] Opening Risk Center');
@@ -410,6 +471,11 @@ export default function GrowthScreen() {
             />
             <FameScoreTrend trend={fameScoreQuery.data.trend} />
           </View>
+        )}
+
+        {/* Persona Guidance Banner */}
+        {onboardingQuery.data?.guidance && (
+          <PersonaGuidanceBanner guidance={onboardingQuery.data.guidance} />
         )}
 
         {/* Badges Section */}
@@ -1211,5 +1277,101 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: "500" as const,
     color: theme.colors.gray[700],
+  },
+  guidanceBanner: {
+    backgroundColor: "#F3E8FF",
+    borderRadius: theme.borderRadius.lg,
+    padding: theme.spacing.md,
+    marginBottom: theme.spacing.lg,
+    borderWidth: 1,
+    borderColor: "#8B5CF6",
+    ...Platform.select({
+      ios: {
+        shadowColor: theme.colors.black,
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
+      },
+      android: {
+        elevation: 2,
+      },
+    }),
+  },
+  guidanceHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 12,
+  },
+  guidanceIconContainer: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    backgroundColor: "#8B5CF6",
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: 12,
+  },
+  guidanceInfo: {
+    flex: 1,
+  },
+  guidanceTitle: {
+    fontSize: 16,
+    fontWeight: "600" as const,
+    color: "#8B5CF6",
+    marginBottom: 2,
+  },
+  guidanceSubtitle: {
+    fontSize: 12,
+    color: "#6B46C1",
+  },
+  guidanceContent: {
+    gap: 12,
+  },
+  guidanceStats: {
+    flexDirection: "row",
+    justifyContent: "space-around",
+    paddingVertical: 8,
+  },
+  guidanceStat: {
+    alignItems: "center",
+  },
+  guidanceStatValue: {
+    fontSize: 16,
+    fontWeight: "700" as const,
+    color: "#8B5CF6",
+    marginBottom: 2,
+  },
+  guidanceStatLabel: {
+    fontSize: 10,
+    color: "#6B46C1",
+    fontWeight: "500" as const,
+  },
+  guidanceReasons: {
+    borderTopWidth: 1,
+    borderTopColor: "#DDD6FE",
+    paddingTop: 12,
+  },
+  guidanceReasonsTitle: {
+    fontSize: 12,
+    fontWeight: "600" as const,
+    color: "#6B46C1",
+    marginBottom: 6,
+  },
+  guidanceReasonItem: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    marginBottom: 4,
+  },
+  guidanceReasonBullet: {
+    fontSize: 12,
+    color: "#8B5CF6",
+    marginRight: 6,
+    marginTop: 1,
+  },
+  guidanceReasonText: {
+    fontSize: 12,
+    color: "#6B46C1",
+    flex: 1,
+    lineHeight: 16,
   },
 });
