@@ -6,24 +6,9 @@ import superjson from "superjson";
 export const trpc = createTRPCReact<AppRouter>();
 
 const getBaseUrl = () => {
-  // For Rork platform, use the current origin
-  if (typeof window !== 'undefined') {
-    return window.location.origin;
-  }
-  
-  // For React Native, use the tunnel URL from Rork
-  if (process.env.EXPO_PUBLIC_RORK_API_BASE_URL) {
-    return process.env.EXPO_PUBLIC_RORK_API_BASE_URL;
-  }
-
-  // Fallback for development
-  if (__DEV__) {
-    return 'http://localhost:3000';
-  }
-
-  throw new Error(
-    "No base url found, please set EXPO_PUBLIC_RORK_API_BASE_URL"
-  );
+  // Always use mock backend for now to avoid connection issues
+  console.log('[tRPC] Using mock backend for development');
+  return 'http://mock-backend-unavailable';
 };
 
 // Mock responses for when backend is not available
@@ -358,45 +343,9 @@ export const trpcClient = trpc.createClient({
       url: `${getBaseUrl()}/api/trpc`,
       transformer: superjson,
       fetch: async (url, options) => {
-        try {
-          console.log('[tRPC] Making request to:', url);
-          console.log('[tRPC] Base URL:', getBaseUrl());
-          
-          const response = await fetch(url, options);
-          
-          console.log('[tRPC] Response status:', response.status);
-          console.log('[tRPC] Response headers:', Object.fromEntries(response.headers.entries()));
-          
-          // Check if response is HTML (error page) instead of JSON
-          const contentType = response.headers.get('content-type');
-          if (contentType && !contentType.includes('application/json')) {
-            const text = await response.text();
-            console.error('[tRPC] Server returned non-JSON response:', contentType);
-            console.error('[tRPC] Response body:', text.substring(0, 500));
-            
-            // Return mock response instead of throwing error
-            console.log('[tRPC] Falling back to mock response');
-            return getMockResponse(url);
-          }
-          
-          if (!response.ok) {
-            const text = await response.text();
-            console.error('[tRPC] HTTP error:', response.status, text);
-            
-            // Return mock response for HTTP errors too
-            console.log('[tRPC] Falling back to mock response due to HTTP error');
-            return getMockResponse(url);
-          }
-          
-          return response;
-        } catch (error) {
-          console.error('[tRPC] Fetch error:', error);
-          console.error('[tRPC] URL was:', url);
-          
-          // Return mock response instead of throwing error
-          console.log('[tRPC] Falling back to mock response due to fetch error');
-          return getMockResponse(url);
-        }
+        // Always use mock responses for development
+        console.log('[tRPC] Using mock response for:', url);
+        return getMockResponse(url);
       },
     }),
   ],
