@@ -27,13 +27,38 @@ export default function E2ETestScreen() {
   const [testResults, setTestResults] = useState<TestResult[]>([]);
   const [isRunning, setIsRunning] = useState(false);
 
-  // tRPC mutations for E2E tests
-  const connectPlatformsMutation = trpc.e2e.connectPlatforms.useMutation();
-  const publishPostsMutation = trpc.e2e.publishPosts.useMutation();
-  const idempotencyTestMutation = trpc.e2e.idempotencyTest.useMutation();
-  const growthUpdatesMutation = trpc.e2e.growthUpdates.useMutation();
-  const badgeStreakCronMutation = trpc.e2e.badgeStreakCron.useMutation();
-  const fullFlowMutation = trpc.e2e.fullFlow.useMutation();
+
+  // tRPC mutations for E2E tests with error handling
+  const connectPlatformsMutation = trpc.e2e.connectPlatforms.useMutation({
+    onError: (error) => {
+      console.error('[E2E] Connect platforms error:', error);
+    }
+  });
+  const publishPostsMutation = trpc.e2e.publishPosts.useMutation({
+    onError: (error) => {
+      console.error('[E2E] Publish posts error:', error);
+    }
+  });
+  const idempotencyTestMutation = trpc.e2e.idempotencyTest.useMutation({
+    onError: (error) => {
+      console.error('[E2E] Idempotency test error:', error);
+    }
+  });
+  const growthUpdatesMutation = trpc.e2e.growthUpdates.useMutation({
+    onError: (error) => {
+      console.error('[E2E] Growth updates error:', error);
+    }
+  });
+  const badgeStreakCronMutation = trpc.e2e.badgeStreakCron.useMutation({
+    onError: (error) => {
+      console.error('[E2E] Badge streak cron error:', error);
+    }
+  });
+  const fullFlowMutation = trpc.e2e.fullFlow.useMutation({
+    onError: (error) => {
+      console.error('[E2E] Full flow error:', error);
+    }
+  });
 
 
   const runIndividualTest = async (testName: string, mutation: any) => {
