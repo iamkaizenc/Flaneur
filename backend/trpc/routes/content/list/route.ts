@@ -489,6 +489,58 @@ export const contentCreateProcedure = publicProcedure
     };
   });
 
+export const contentLogsProcedure = publicProcedure
+  .input(z.object({
+    limit: z.number().min(1).max(100).default(20),
+    platform: z.string().optional(),
+    status: z.enum(["draft", "queued", "published", "held", "error"]).optional()
+  }))
+  .query(async ({ input }) => {
+    console.log("[Content] Fetching content logs with filters:", input);
+    
+    let filtered = [...mockContent];
+    
+    if (input.platform) {
+      filtered = filtered.filter(item => item.platform === input.platform);
+    }
+    
+    if (input.status) {
+      filtered = filtered.filter(item => item.status === input.status);
+    }
+    
+    // Sort by updated date (most recent first)
+    filtered.sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime());
+    
+    // Apply limit
+    const logs = filtered.slice(0, input.limit);
+    
+    return {
+      logs: logs.map(item => ({
+        id: item.id,
+        platform: item.platform,
+        status: item.status,
+        title: item.title,
+        body: item.body.substring(0, 150) + (item.body.length > 150 ? '...' : ''),
+        createdAt: item.createdAt.toISOString(),
+        scheduledAt: item.scheduledAt,
+        publishedAt: (item as any).publishedAt,
+        publishAttempts: item.publishAttempts,
+        heldReason: item.platformLimitsInfo?.reason,
+        friendlyReason: item.platformLimitsInfo?.friendlyReason,
+        friendlyStatus: getFriendlyStatus(item.status),
+        // Developer mode trace data
+        trace: {
+          idempotencyKey: (item as any).idempotencyKey,
+          publishedId: (item as any).publishedId,
+          platformLimitsInfo: item.platformLimitsInfo,
+          updatedAt: item.updatedAt.toISOString()
+        }
+      })),
+      total: filtered.length,
+      hasMore: filtered.length > input.limit
+    };
+  });
+
 export const contentStatsProcedure = publicProcedure
   .query(async () => {
     const queueStatus = {

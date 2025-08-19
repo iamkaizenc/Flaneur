@@ -39,7 +39,20 @@
     "why_strategy": "Neden bu strateji?",
     "photo": "Fotoğraf",
     "video": "Video",
-    "ig_posts": "IG Posts"
+    "ig_posts": "IG Posts",
+    "publish_history": "Yayın Geçmişi",
+    "all_platforms": "Tüm Platformlar",
+    "all_statuses": "Tüm Durumlar",
+    "show_trace": "İz Göster"
+  },
+  "publish": {
+    "status": {
+      "draft": "Taslak",
+      "queued": "Sahne Sıranda",
+      "published": "Sahnede",
+      "held": "Sahne Arkasında",
+      "error": "Teknik Sorun"
+    }
   },
   "settings": {
     "language": "Dil",

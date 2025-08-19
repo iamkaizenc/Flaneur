@@ -8,6 +8,7 @@ import {
   Platform,
   Dimensions,
   FlatList,
+  Modal,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { 
@@ -29,6 +30,10 @@ import {
   Shield,
   CheckCircle,
   Settings,
+  Clock,
+  Filter,
+  X,
+  Code,
 } from "lucide-react-native";
 import { useTranslation } from 'react-i18next';
 import { useAIMarketer } from "@/providers/AIMarketerProvider";
@@ -418,6 +423,12 @@ export default function GrowthScreen() {
   const { metrics } = useAIMarketer();
   const [showSuccessBanner, setShowSuccessBanner] = React.useState(false);
   const [successMessage, setSuccessMessage] = React.useState('');
+  const [activeTab, setActiveTab] = React.useState<'overview' | 'logs'>('overview');
+  const [selectedPlatform, setSelectedPlatform] = React.useState<string>('');
+  const [selectedStatus, setSelectedStatus] = React.useState<string>('');
+  const [showTraceModal, setShowTraceModal] = React.useState(false);
+  const [selectedTrace, setSelectedTrace] = React.useState<any>(null);
+  
   const insightsQuery = trpc.insights.list.useQuery({ range: "7d" });
   const fameScoreQuery = trpc.fameScore.get.useQuery({ userId: "user-1" });
   const badgesQuery = trpc.badges.list.useQuery({ userId: "user-1" });
@@ -425,6 +436,11 @@ export default function GrowthScreen() {
   const challengeQuery = trpc.challenges.weekly.useQuery({ userId: "user-1" });
   const riskStatusQuery = trpc.risk.getStatus.useQuery({ range: "7d" });
   const onboardingQuery = trpc.onboarding.get.useQuery({ userId: "user-1" });
+  const contentLogsQuery = trpc.content.logs.useQuery({
+    limit: 20,
+    platform: selectedPlatform || undefined,
+    status: selectedStatus as any || undefined
+  });
   
   // Listen for AI publish success events
   React.useEffect(() => {
@@ -445,6 +461,213 @@ export default function GrowthScreen() {
     console.log('[Growth] Opening Risk Center');
     // Navigate to Risk Center in Settings
   };
+  
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffMins = Math.floor(diffMs / (1000 * 60));
+    const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+    
+    if (diffMins < 60) {
+      return `${diffMins}dk önce`;
+    } else if (diffHours < 24) {
+      return `${diffHours}sa önce`;
+    } else if (diffDays < 7) {
+      return `${diffDays}g önce`;
+    } else {
+      return date.toLocaleDateString('tr-TR', {
+        day: '2-digit',
+        month: '2-digit',
+        year: '2-digit'
+      });
+    }
+  };
+  
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'draft': return '#6B7280'; // gray
+      case 'queued': return '#3B82F6'; // blue
+      case 'published': return '#10B981'; // green
+      case 'held': return '#EF4444'; // red
+      case 'error': return '#F59E0B'; // orange
+      default: return '#6B7280';
+    }
+  };
+  
+  const getPlatformIcon = (platform: string) => {
+    switch (platform) {
+      case 'x': return '𝕏';
+      case 'instagram': return '📷';
+      case 'linkedin': return '💼';
+      case 'telegram': return '✈️';
+      case 'tiktok': return '🎵';
+      case 'facebook': return '👥';
+      default: return '📱';
+    }
+  };
+  
+  const handleShowTrace = (log: any) => {
+    setSelectedTrace(log);
+    setShowTraceModal(true);
+  };
+
+  const renderTabBar = () => (
+    <View style={styles.tabBar}>
+      <TouchableOpacity 
+        style={[styles.tab, activeTab === 'overview' && styles.activeTab]}
+        onPress={() => setActiveTab('overview')}
+      >
+        <Text style={[styles.tabText, activeTab === 'overview' && styles.activeTabText]}>
+          {t('growth.insights_title')}
+        </Text>
+      </TouchableOpacity>
+      <TouchableOpacity 
+        style={[styles.tab, activeTab === 'logs' && styles.activeTab]}
+        onPress={() => setActiveTab('logs')}
+      >
+        <Text style={[styles.tabText, activeTab === 'logs' && styles.activeTabText]}>
+          {t('growth.publish_history')}
+        </Text>
+      </TouchableOpacity>
+    </View>
+  );
+  
+  const renderLogItem = ({ item }: { item: any }) => (
+    <TouchableOpacity 
+      style={styles.logItem}
+      onPress={() => handleShowTrace(item)}
+      activeOpacity={0.7}
+    >
+      <View style={styles.logHeader}>
+        <View style={styles.logPlatformContainer}>
+          <Text style={styles.logPlatformIcon}>{getPlatformIcon(item.platform)}</Text>
+          <View style={[styles.logStatusBadge, { backgroundColor: getStatusColor(item.status) }]}>
+            <Text style={styles.logStatusText}>{item.friendlyStatus}</Text>
+          </View>
+        </View>
+        <Text style={styles.logTime}>{formatDate(item.createdAt)}</Text>
+      </View>
+      
+      <Text style={styles.logTitle} numberOfLines={1}>{item.title}</Text>
+      <Text style={styles.logBody} numberOfLines={2}>{item.body}</Text>
+      
+      {item.heldReason && (
+        <View style={styles.logReasonContainer}>
+          <AlertTriangle size={14} color="#EF4444" />
+          <Text style={styles.logReason}>{item.friendlyReason || item.heldReason}</Text>
+        </View>
+      )}
+      
+      <View style={styles.logFooter}>
+        <Clock size={12} color={theme.colors.gray[400]} />
+        <Text style={styles.logFooterText}>
+          {item.scheduledAt ? formatDate(item.scheduledAt) : 'Zamanlanmamış'}
+        </Text>
+        {item.publishAttempts > 0 && (
+          <Text style={styles.logAttempts}>• {item.publishAttempts} deneme</Text>
+        )}
+      </View>
+    </TouchableOpacity>
+  );
+  
+  const renderFilters = () => (
+    <View style={styles.filtersContainer}>
+      <TouchableOpacity 
+        style={styles.filterButton}
+        onPress={() => {
+          // Platform filter logic
+          const platforms = ['', 'x', 'instagram', 'linkedin', 'telegram', 'tiktok'];
+          const currentIndex = platforms.indexOf(selectedPlatform);
+          const nextIndex = (currentIndex + 1) % platforms.length;
+          setSelectedPlatform(platforms[nextIndex]);
+        }}
+      >
+        <Filter size={16} color={theme.colors.gray[400]} />
+        <Text style={styles.filterText}>
+          {selectedPlatform ? getPlatformIcon(selectedPlatform) : t('growth.all_platforms')}
+        </Text>
+      </TouchableOpacity>
+      
+      <TouchableOpacity 
+        style={styles.filterButton}
+        onPress={() => {
+          // Status filter logic
+          const statuses = ['', 'draft', 'queued', 'published', 'held', 'error'];
+          const currentIndex = statuses.indexOf(selectedStatus);
+          const nextIndex = (currentIndex + 1) % statuses.length;
+          setSelectedStatus(statuses[nextIndex]);
+        }}
+      >
+        <Filter size={16} color={theme.colors.gray[400]} />
+        <Text style={styles.filterText}>
+          {selectedStatus ? t(`publish.status.${selectedStatus}`) : t('growth.all_statuses')}
+        </Text>
+      </TouchableOpacity>
+    </View>
+  );
+  
+  const renderTraceModal = () => (
+    <Modal
+      visible={showTraceModal}
+      animationType="slide"
+      presentationStyle="pageSheet"
+      onRequestClose={() => setShowTraceModal(false)}
+    >
+      <SafeAreaView style={styles.modalContainer}>
+        <View style={styles.modalHeader}>
+          <Text style={styles.modalTitle}>{t('growth.show_trace')}</Text>
+          <TouchableOpacity onPress={() => setShowTraceModal(false)}>
+            <X size={24} color={theme.colors.white} />
+          </TouchableOpacity>
+        </View>
+        
+        {selectedTrace && (
+          <ScrollView style={styles.modalContent}>
+            <View style={styles.traceSection}>
+              <Text style={styles.traceSectionTitle}>Content Info</Text>
+              <Text style={styles.traceText}>ID: {selectedTrace.id}</Text>
+              <Text style={styles.traceText}>Platform: {selectedTrace.platform}</Text>
+              <Text style={styles.traceText}>Status: {selectedTrace.status}</Text>
+              <Text style={styles.traceText}>Title: {selectedTrace.title}</Text>
+            </View>
+            
+            <View style={styles.traceSection}>
+              <Text style={styles.traceSectionTitle}>Timestamps</Text>
+              <Text style={styles.traceText}>Created: {selectedTrace.createdAt}</Text>
+              <Text style={styles.traceText}>Updated: {selectedTrace.trace.updatedAt}</Text>
+              {selectedTrace.scheduledAt && (
+                <Text style={styles.traceText}>Scheduled: {selectedTrace.scheduledAt}</Text>
+              )}
+              {selectedTrace.publishedAt && (
+                <Text style={styles.traceText}>Published: {selectedTrace.publishedAt}</Text>
+              )}
+            </View>
+            
+            {selectedTrace.trace.idempotencyKey && (
+              <View style={styles.traceSection}>
+                <Text style={styles.traceSectionTitle}>Idempotency</Text>
+                <Text style={styles.traceText}>Key: {selectedTrace.trace.idempotencyKey}</Text>
+                {selectedTrace.trace.publishedId && (
+                  <Text style={styles.traceText}>Published ID: {selectedTrace.trace.publishedId}</Text>
+                )}
+              </View>
+            )}
+            
+            {selectedTrace.trace.platformLimitsInfo && (
+              <View style={styles.traceSection}>
+                <Text style={styles.traceSectionTitle}>Platform Limits</Text>
+                <Text style={styles.traceText}>
+                  {JSON.stringify(selectedTrace.trace.platformLimitsInfo, null, 2)}
+                </Text>
+              </View>
+            )}
+          </ScrollView>
+        )}
+      </SafeAreaView>
+    </Modal>
+  );
 
   return (
     <SafeAreaView style={styles.container}>
@@ -469,11 +692,16 @@ export default function GrowthScreen() {
           </Text>
         </View>
       </View>
+      
+      {renderTabBar()}
+      
+      {activeTab === 'logs' && renderFilters()}
 
-      <ScrollView
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
-      >
+      {activeTab === 'overview' ? (
+        <ScrollView
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+        >
         <View style={styles.metricsGrid}>
           <MetricCard
             title="Followers"
@@ -597,17 +825,30 @@ export default function GrowthScreen() {
           </View>
         </View>
 
-        <View style={styles.summaryCard}>
-          <Text style={styles.summaryTitle}>{t('growth.fame_summary')}</Text>
-          <Text style={styles.summaryText}>
-            Bu hafta sahne performansın harika! Etkileşim oranın %24 arttı ve takipçi kazanımın istikrarlı şekilde %12 seviyesinde. 
-            Flâneur ajanın optimal paylaşım zamanlarını belirledi ve stratejini hassas şekilde ayarladı.
-          </Text>
-          <TouchableOpacity style={styles.detailsButton}>
-            <Text style={styles.detailsButtonText}>{t('growth.detailed_report')}</Text>
-          </TouchableOpacity>
-        </View>
-      </ScrollView>
+          <View style={styles.summaryCard}>
+            <Text style={styles.summaryTitle}>{t('growth.fame_summary')}</Text>
+            <Text style={styles.summaryText}>
+              Bu hafta sahne performansın harika! Etkileşim oranın %24 arttı ve takipçi kazanımın istikrarlı şekilde %12 seviyesinde. 
+              Flâneur ajanın optimal paylaşım zamanlarını belirledi ve stratejini hassas şekilde ayarladı.
+            </Text>
+            <TouchableOpacity style={styles.detailsButton}>
+              <Text style={styles.detailsButtonText}>{t('growth.detailed_report')}</Text>
+            </TouchableOpacity>
+          </View>
+        </ScrollView>
+      ) : (
+        <FlatList
+          data={contentLogsQuery.data?.logs || []}
+          renderItem={renderLogItem}
+          keyExtractor={(item) => item.id}
+          contentContainerStyle={styles.logsContent}
+          showsVerticalScrollIndicator={false}
+          refreshing={contentLogsQuery.isLoading}
+          onRefresh={() => contentLogsQuery.refetch()}
+        />
+      )}
+      
+      {renderTraceModal()}
     </SafeAreaView>
   );
 }
@@ -1410,5 +1651,209 @@ const styles = StyleSheet.create({
     color: "#6B46C1",
     flex: 1,
     lineHeight: 16,
+  },
+  // Tab bar styles
+  tabBar: {
+    flexDirection: "row",
+    backgroundColor: theme.colors.gray[900],
+    marginHorizontal: theme.spacing.md,
+    borderRadius: theme.borderRadius.lg,
+    padding: 4,
+    marginBottom: theme.spacing.md,
+  },
+  tab: {
+    flex: 1,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: theme.borderRadius.md,
+    alignItems: "center",
+  },
+  activeTab: {
+    backgroundColor: theme.colors.white,
+  },
+  tabText: {
+    fontSize: 14,
+    fontWeight: "500" as const,
+    color: theme.colors.gray[400],
+  },
+  activeTabText: {
+    color: theme.colors.black,
+    fontWeight: "600" as const,
+  },
+  // Logs content styles
+  logsContent: {
+    paddingHorizontal: theme.spacing.md,
+    paddingBottom: theme.spacing.xl,
+  },
+  logItem: {
+    backgroundColor: theme.colors.white,
+    borderRadius: theme.borderRadius.lg,
+    padding: theme.spacing.md,
+    marginBottom: 12,
+    ...Platform.select({
+      ios: {
+        shadowColor: theme.colors.black,
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
+      },
+      android: {
+        elevation: 2,
+      },
+    }),
+  },
+  logHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 8,
+  },
+  logPlatformContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  logPlatformIcon: {
+    fontSize: 16,
+  },
+  logStatusBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  logStatusText: {
+    fontSize: 10,
+    fontWeight: "600" as const,
+    color: theme.colors.white,
+  },
+  logTime: {
+    fontSize: 12,
+    color: theme.colors.gray[500],
+  },
+  logTitle: {
+    fontSize: 16,
+    fontWeight: "600" as const,
+    color: theme.colors.black,
+    marginBottom: 4,
+  },
+  logBody: {
+    fontSize: 14,
+    color: theme.colors.gray[600],
+    lineHeight: 20,
+    marginBottom: 8,
+  },
+  logReasonContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    marginBottom: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    backgroundColor: "#FEE2E2",
+    borderRadius: 6,
+  },
+  logReason: {
+    fontSize: 12,
+    color: "#EF4444",
+    flex: 1,
+  },
+  logFooter: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  logFooterText: {
+    fontSize: 12,
+    color: theme.colors.gray[500],
+  },
+  logAttempts: {
+    fontSize: 12,
+    color: theme.colors.gray[500],
+    marginLeft: 8,
+  },
+  // Filter styles
+  filtersContainer: {
+    flexDirection: "row",
+    paddingHorizontal: theme.spacing.md,
+    gap: 12,
+    marginBottom: theme.spacing.md,
+  },
+  filterButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    backgroundColor: theme.colors.gray[800],
+    borderRadius: theme.borderRadius.md,
+    borderWidth: 1,
+    borderColor: theme.colors.gray[700],
+  },
+  filterText: {
+    fontSize: 12,
+    color: theme.colors.gray[300],
+    fontWeight: "500" as const,
+  },
+  // Modal styles
+  modalContainer: {
+    flex: 1,
+    backgroundColor: theme.colors.black,
+  },
+  modalHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingHorizontal: theme.spacing.md,
+    paddingVertical: theme.spacing.lg,
+    borderBottomWidth: 1,
+    borderBottomColor: theme.colors.gray[800],
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: "600" as const,
+    color: theme.colors.white,
+  },
+  modalContent: {
+    flex: 1,
+    paddingHorizontal: theme.spacing.md,
+    paddingTop: theme.spacing.md,
+  },
+  traceSection: {
+    marginBottom: theme.spacing.lg,
+    padding: theme.spacing.md,
+    backgroundColor: theme.colors.gray[900],
+    borderRadius: theme.borderRadius.lg,
+  },
+  traceSectionTitle: {
+    fontSize: 16,
+    fontWeight: "600" as const,
+    color: theme.colors.white,
+    marginBottom: 8,
+  },
+  traceText: {
+    fontSize: 12,
+    color: theme.colors.gray[300],
+    fontFamily: "monospace",
+    marginBottom: 4,
+  },
+  // Success banner styles
+  successBanner: {
+    backgroundColor: "#10B981",
+    paddingHorizontal: theme.spacing.md,
+    paddingVertical: 12,
+    marginHorizontal: theme.spacing.md,
+    marginTop: theme.spacing.sm,
+    borderRadius: theme.borderRadius.lg,
+  },
+  successBannerContent: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  successBannerText: {
+    fontSize: 14,
+    fontWeight: "500" as const,
+    color: theme.colors.white,
+    flex: 1,
   },
 });

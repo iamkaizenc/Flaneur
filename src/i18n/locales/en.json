@@ -39,7 +39,20 @@
     "why_strategy": "Why this strategy?",
     "photo": "Photo",
     "video": "Video",
-    "ig_posts": "IG Posts"
+    "ig_posts": "IG Posts",
+    "publish_history": "Publish History",
+    "all_platforms": "All Platforms",
+    "all_statuses": "All Statuses",
+    "show_trace": "Show Trace"
+  },
+  "publish": {
+    "status": {
+      "draft": "Draft",
+      "queued": "Queued",
+      "published": "Published",
+      "held": "Held",
+      "error": "Error"
+    }
   },
   "settings": {
     "language": "Language",

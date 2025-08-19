@@ -8,7 +8,7 @@ import {
   oauthListAccountsProcedure,
   oauthFixProcedure
 } from "./routes/oauth/route";
-import { contentListProcedure, contentQueueProcedure, contentHoldProcedure, contentRetryProcedure, contentCreateProcedure, contentStatsProcedure } from "./routes/content/list/route";
+import { contentListProcedure, contentQueueProcedure, contentHoldProcedure, contentRetryProcedure, contentCreateProcedure, contentStatsProcedure, contentLogsProcedure } from "./routes/content/list/route";
 import { insightsListProcedure } from "./routes/insights/list/route";
 import { settingsGetProcedure, settingsUpdateProcedure, settingsConnectProcedure, settingsDisconnectProcedure, settingsTestNotificationProcedure, settingsGetHealthProcedure, settingsGetVersionProcedure } from "./routes/settings/route";
 import { authRegisterProcedure, authLoginProcedure, authLogoutProcedure, authMeProcedure, authUpdateProfileProcedure, authUpdateEmailProcedure, authUpdatePasswordProcedure, authDeleteAccountProcedure } from "./routes/auth/route";
@@ -61,6 +61,7 @@ export const appRouter = createTRPCRouter({
     retry: contentRetryProcedure,
     create: contentCreateProcedure,
     stats: contentStatsProcedure,
+    logs: contentLogsProcedure,
   }),
   insights: createTRPCRouter({
     list: insightsListProcedure,
