@@ -40,6 +40,7 @@ import { useAIMarketer } from "@/providers/AIMarketerProvider";
 import { theme, brandName } from "@/constants/theme";
 import { trpc } from "@/lib/trpc";
 import { BrandLogo } from "@/components/Logo";
+import { AIPublishModal } from "@/components/AIPublishModal";
 
 const { width } = Dimensions.get('window');
 
@@ -428,6 +429,7 @@ export default function GrowthScreen() {
   const [selectedStatus, setSelectedStatus] = React.useState<string>('');
   const [showTraceModal, setShowTraceModal] = React.useState(false);
   const [selectedTrace, setSelectedTrace] = React.useState<any>(null);
+  const [showAIPublishModal, setShowAIPublishModal] = React.useState(false);
   
   const insightsQuery = trpc.insights.list.useQuery({ range: "7d" });
   const fameScoreQuery = trpc.fameScore.get.useQuery({ userId: "user-1" });
@@ -511,6 +513,16 @@ export default function GrowthScreen() {
   const handleShowTrace = (log: any) => {
     setSelectedTrace(log);
     setShowTraceModal(true);
+  };
+  
+  const handleAIPublishSuccess = (items: any[]) => {
+    console.log('[Growth] AI Publish success:', items);
+    // Refresh content logs
+    contentLogsQuery.refetch();
+    // Show success message
+    setSuccessMessage(`${items.length} içerik AI tarafından oluşturuldu ve sıraya eklendi!`);
+    setShowSuccessBanner(true);
+    setTimeout(() => setShowSuccessBanner(false), 5000);
   };
 
   const renderTabBar = () => (
@@ -691,6 +703,13 @@ export default function GrowthScreen() {
             {t('tagline')}
           </Text>
         </View>
+        <TouchableOpacity 
+          style={styles.aiPublishButton}
+          onPress={() => setShowAIPublishModal(true)}
+          activeOpacity={0.7}
+        >
+          <Text style={styles.aiPublishButtonText}>AI Yayınla</Text>
+        </TouchableOpacity>
       </View>
       
       {renderTabBar()}
@@ -849,6 +868,12 @@ export default function GrowthScreen() {
       )}
       
       {renderTraceModal()}
+      
+      <AIPublishModal
+        visible={showAIPublishModal}
+        onClose={() => setShowAIPublishModal(false)}
+        onSuccess={handleAIPublishSuccess}
+      />
     </SafeAreaView>
   );
 }
@@ -864,6 +889,9 @@ const styles = StyleSheet.create({
     paddingTop: theme.spacing.md,
   },
   header: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     paddingHorizontal: theme.spacing.md,
     paddingVertical: theme.spacing.lg,
     borderBottomWidth: 1,
@@ -1855,5 +1883,16 @@ const styles = StyleSheet.create({
     fontWeight: "500" as const,
     color: theme.colors.white,
     flex: 1,
+  },
+  aiPublishButton: {
+    backgroundColor: theme.colors.white,
+    borderRadius: theme.borderRadius.md,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+  },
+  aiPublishButtonText: {
+    fontSize: 14,
+    fontWeight: "600" as const,
+    color: theme.colors.black,
   },
 });

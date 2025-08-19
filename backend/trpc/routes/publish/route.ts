@@ -277,15 +277,23 @@ Görev:
     let generatedContent: GeneratedContent[];
     
     try {
+      // Check if response has completion field
+      if (!data.completion) {
+        console.error('No completion field in AI response:', data);
+        throw new Error('Invalid AI response format');
+      }
+      
       // Try to parse JSON from completion
       const jsonMatch = data.completion.match(/\[.*\]/s);
       if (jsonMatch) {
         generatedContent = JSON.parse(jsonMatch[0]);
       } else {
+        console.error('No JSON array found in AI response:', data.completion);
         throw new Error('No JSON found in response');
       }
     } catch (parseError) {
       console.error('Failed to parse AI response:', parseError);
+      console.error('Raw response:', data);
       // Fallback to mock content
       generatedContent = generateMockContent(platforms, count);
     }
