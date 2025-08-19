@@ -39,6 +39,7 @@ import {
   riskResolveAlertProcedure, 
   riskSimulateAlertProcedure 
 } from "./routes/risk/route";
+import { publishGenerateProcedure, publishBatchQueueProcedure } from "./routes/publish/route";
 
 export const appRouter = createTRPCRouter({
   example: createTRPCRouter({
@@ -164,6 +165,10 @@ export const appRouter = createTRPCRouter({
     createAlert: riskCreateAlertProcedure,
     resolveAlert: riskResolveAlertProcedure,
     simulateAlert: riskSimulateAlertProcedure,
+  }),
+  publish: createTRPCRouter({
+    generate: publishGenerateProcedure,
+    batchQueue: publishBatchQueueProcedure,
   }),
 });
 

@@ -416,6 +416,8 @@ const PersonaGuidanceBanner: React.FC<PersonaGuidanceBannerProps> = ({ guidance 
 export default function GrowthScreen() {
   const { t } = useTranslation();
   const { metrics } = useAIMarketer();
+  const [showSuccessBanner, setShowSuccessBanner] = React.useState(false);
+  const [successMessage, setSuccessMessage] = React.useState('');
   const insightsQuery = trpc.insights.list.useQuery({ range: "7d" });
   const fameScoreQuery = trpc.fameScore.get.useQuery({ userId: "user-1" });
   const badgesQuery = trpc.badges.list.useQuery({ userId: "user-1" });
@@ -424,6 +426,21 @@ export default function GrowthScreen() {
   const riskStatusQuery = trpc.risk.getStatus.useQuery({ range: "7d" });
   const onboardingQuery = trpc.onboarding.get.useQuery({ userId: "user-1" });
   
+  // Listen for AI publish success events
+  React.useEffect(() => {
+    // This would be triggered by the AI publish success
+    // For demo purposes, we'll show it briefly
+    const timer = setTimeout(() => {
+      setSuccessMessage('FameScore +6 olabilir 🎉 AI içerikler yayınlandı!');
+      setShowSuccessBanner(true);
+      
+      // Auto dismiss after 5 seconds
+      setTimeout(() => setShowSuccessBanner(false), 5000);
+    }, 2000);
+    
+    return () => clearTimeout(timer);
+  }, []);
+  
   const handleOpenRiskCenter = () => {
     console.log('[Growth] Opening Risk Center');
     // Navigate to Risk Center in Settings
@@ -431,6 +448,19 @@ export default function GrowthScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
+      {showSuccessBanner && (
+        <TouchableOpacity 
+          style={styles.successBanner} 
+          onPress={() => setShowSuccessBanner(false)}
+          activeOpacity={0.8}
+        >
+          <View style={styles.successBannerContent}>
+            <CheckCircle size={20} color={theme.colors.white} />
+            <Text style={styles.successBannerText}>{successMessage}</Text>
+          </View>
+        </TouchableOpacity>
+      )}
+      
       <View style={styles.header}>
         <View style={styles.headerBranding}>
           <BrandLogo size="md" />

@@ -19,13 +19,16 @@ import {
   Instagram,
   Linkedin,
   Send,
+  Sparkles,
+  Plus,
 } from "lucide-react-native";
 import { router } from "expo-router";
 import { useAIMarketer } from "@/providers/AIMarketerProvider";
 import { theme, brandName } from "@/constants/theme";
 import { trpc } from "@/lib/trpc";
+import { AIPublishModal } from "@/components/AIPublishModal";
 
-type ContentStatus = "draft" | "queued" | "published" | "held";
+type ContentStatus = "draft" | "queued" | "published" | "held" | "error";
 
 interface ContentCardProps {
   title: string;
@@ -102,6 +105,7 @@ const ContentCard: React.FC<ContentCardProps> = ({
 
 export default function ContentScreen() {
   const [selectedFilter, setSelectedFilter] = useState<ContentStatus | "all">("all");
+  const [showAIModal, setShowAIModal] = useState<boolean>(false);
   const contentQuery = trpc.content.list.useQuery({
     limit: 50,
     status: selectedFilter === "all" ? undefined : selectedFilter,
@@ -126,11 +130,38 @@ export default function ContentScreen() {
     });
   };
 
+  const handleAISuccess = (items: any[]) => {
+    console.log('AI generated items:', items);
+    // Refresh content list
+    contentQuery.refetch();
+  };
+
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.brandName}>{brandName}</Text>
-        <Text style={styles.brandTagline}>Content Calendar</Text>
+        <View style={styles.headerContent}>
+          <View>
+            <Text style={styles.brandName}>{brandName}</Text>
+            <Text style={styles.brandTagline}>Content Calendar</Text>
+          </View>
+          <View style={styles.headerActions}>
+            <TouchableOpacity
+              style={styles.aiButton}
+              onPress={() => setShowAIModal(true)}
+              activeOpacity={0.7}
+            >
+              <Sparkles size={20} color={theme.colors.black} />
+              <Text style={styles.aiButtonText}>AI Üret</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.addButton}
+              onPress={() => {/* Handle manual add */}}
+              activeOpacity={0.7}
+            >
+              <Plus size={20} color={theme.colors.gray[400]} />
+            </TouchableOpacity>
+          </View>
+        </View>
       </View>
 
       <ScrollView
@@ -211,13 +242,19 @@ export default function ContentScreen() {
               title={item.title}
               platform={item.platform}
               status={item.status}
-              scheduledTime={item.scheduledTime}
+              scheduledTime={item.scheduledAt || 'Not scheduled'}
               preview={item.preview}
               onPress={() => handleContentPress(item.id)}
             />
           ))}
         </View>
       </ScrollView>
+      
+      <AIPublishModal
+        visible={showAIModal}
+        onClose={() => setShowAIModal(false)}
+        onSuccess={handleAISuccess}
+      />
     </SafeAreaView>
   );
 }
@@ -237,6 +274,50 @@ const styles = StyleSheet.create({
     paddingVertical: theme.spacing.lg,
     borderBottomWidth: 1,
     borderBottomColor: theme.colors.gray[800],
+  },
+  headerContent: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  headerActions: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  aiButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: theme.colors.white,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 20,
+    gap: 6,
+    ...Platform.select({
+      ios: {
+        shadowColor: theme.colors.black,
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
+      },
+      android: {
+        elevation: 2,
+      },
+    }),
+  },
+  aiButtonText: {
+    fontSize: 14,
+    fontWeight: '600' as const,
+    color: theme.colors.black,
+  },
+  addButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: theme.colors.gray[900],
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: theme.colors.gray[700],
   },
   brandName: {
     fontSize: 28,
@@ -421,6 +502,9 @@ const styles = StyleSheet.create({
   status_draft: {
     backgroundColor: "#F3F4F6",
   },
+  status_error: {
+    backgroundColor: "#FEE2E2",
+  },
   statusText: {
     fontSize: 12,
     fontWeight: "500" as const,
@@ -436,6 +520,9 @@ const styles = StyleSheet.create({
   },
   statusText_draft: {
     color: "#6B7280",
+  },
+  statusText_error: {
+    color: "#DC2626",
   },
   contentTitle: {
     fontSize: 16,
