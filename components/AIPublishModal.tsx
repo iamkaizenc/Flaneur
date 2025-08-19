@@ -8,7 +8,7 @@ import {
   ScrollView,
   Alert,
   ActivityIndicator,
-  Platform,
+  Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {
@@ -22,10 +22,13 @@ import {
   AlertTriangle,
   Clock,
   Zap,
+  RefreshCw,
+  Image as ImageIcon,
+  AlertCircle,
 } from 'lucide-react-native';
 import { theme } from '@/constants/theme';
 import { trpc } from '@/lib/trpc';
-import { useTranslation } from 'react-i18next';
+// import { useTranslation } from 'react-i18next';
 
 interface AIPublishModalProps {
   visible: boolean;
@@ -49,6 +52,8 @@ interface GeneratedContentItem {
   status: 'draft' | 'held';
   heldReason?: string;
   mediaPrompt?: string;
+  mediaUrl?: string;
+  mediaError?: string;
 }
 
 const PlatformIcon = ({ platform, size = 20, color }: { platform: string; size?: number; color?: string }) => {
@@ -83,6 +88,7 @@ export const AIPublishModal: React.FC<AIPublishModalProps> = ({
 
   const generateMutation = trpc.publish.generate.useMutation();
   const batchQueueMutation = trpc.publish.batchQueue.useMutation();
+  const regenerateMediaMutation = trpc.publish.regenerateMedia.useMutation();
 
   const platforms: PlatformOption[] = [
     { id: 'x', name: 'X (Twitter)', icon: Twitter, color: '#1DA1F2', enabled: true },
@@ -147,6 +153,34 @@ export const AIPublishModal: React.FC<AIPublishModalProps> = ({
         ? prev.filter(id => id !== itemId)
         : [...prev, itemId]
     );
+  };
+
+  const handleRegenerateMedia = async (item: GeneratedContentItem) => {
+    if (!item.mediaPrompt) return;
+    
+    try {
+      const result = await regenerateMediaMutation.mutateAsync({
+        itemId: item.id,
+        mediaPrompt: item.mediaPrompt,
+        platform: item.platform as any
+      });
+      
+      if (result.success) {
+        // Update the item in generatedContent
+        setGeneratedContent(prev => 
+          prev.map(prevItem => 
+            prevItem.id === item.id 
+              ? { ...prevItem, mediaUrl: result.mediaUrl, mediaError: undefined }
+              : prevItem
+          )
+        );
+      } else {
+        Alert.alert('Hata', result.error || 'Medya yeniden oluşturulamadı');
+      }
+    } catch (error) {
+      console.error('Regenerate media error:', error);
+      Alert.alert('Hata', 'Medya yeniden oluşturulurken hata oluştu.');
+    }
   };
 
   const handlePublish = async () => {
@@ -361,6 +395,55 @@ export const AIPublishModal: React.FC<AIPublishModalProps> = ({
             <Text style={styles.contentPreviewBody} numberOfLines={3}>
               {item.body}
             </Text>
+            
+            {/* Media Preview */}
+            {item.mediaPrompt && (
+              <View style={styles.mediaSection}>
+                <View style={styles.mediaHeader}>
+                  <ImageIcon size={14} color={theme.colors.gray[400]} />
+                  <Text style={styles.mediaLabel}>Medya</Text>
+                  {item.mediaPrompt && (
+                    <TouchableOpacity
+                      style={styles.regenerateButton}
+                      onPress={() => handleRegenerateMedia(item)}
+                      disabled={regenerateMediaMutation.isPending}
+                    >
+                      <RefreshCw 
+                        size={12} 
+                        color={theme.colors.gray[400]} 
+                        style={{
+                          transform: [{ 
+                            rotate: regenerateMediaMutation.isPending ? '180deg' : '0deg' 
+                          }]
+                        }}
+                      />
+                      <Text style={styles.regenerateText}>Değiştir</Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+                
+                {item.mediaUrl ? (
+                  <View style={styles.mediaPreview}>
+                    <Image 
+                      source={{ uri: item.mediaUrl }} 
+                      style={styles.mediaImage}
+                      resizeMode="cover"
+                    />
+                  </View>
+                ) : item.mediaError ? (
+                  <View style={styles.mediaError}>
+                    <AlertCircle size={16} color={theme.colors.warning} />
+                    <Text style={styles.mediaErrorText}>{item.mediaError}</Text>
+                  </View>
+                ) : (
+                  <View style={styles.mediaLoading}>
+                    <ActivityIndicator size="small" color={theme.colors.gray[400]} />
+                    <Text style={styles.mediaLoadingText}>Görsel oluşturuluyor...</Text>
+                  </View>
+                )}
+              </View>
+            )}
+            
             {item.status === 'held' && item.heldReason && (
               <View style={styles.heldReason}>
                 <Text style={styles.heldReasonText}>{item.heldReason}</Text>
@@ -746,5 +829,67 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: theme.colors.gray[300],
     textAlign: 'center',
+  },
+  mediaSection: {
+    marginTop: 12,
+    padding: 8,
+    backgroundColor: theme.colors.gray[800],
+    borderRadius: 6,
+  },
+  mediaHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 8,
+  },
+  mediaLabel: {
+    fontSize: 11,
+    color: theme.colors.gray[400],
+    flex: 1,
+  },
+  regenerateButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+    backgroundColor: theme.colors.gray[700],
+  },
+  regenerateText: {
+    fontSize: 10,
+    color: theme.colors.gray[400],
+  },
+  mediaPreview: {
+    borderRadius: 4,
+    overflow: 'hidden',
+  },
+  mediaImage: {
+    width: '100%',
+    height: 80,
+    backgroundColor: theme.colors.gray[700],
+  },
+  mediaError: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    padding: 6,
+    backgroundColor: 'rgba(251, 146, 60, 0.1)',
+    borderRadius: 4,
+  },
+  mediaErrorText: {
+    fontSize: 10,
+    color: theme.colors.warning,
+    flex: 1,
+  },
+  mediaLoading: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    padding: 6,
+  },
+  mediaLoadingText: {
+    fontSize: 10,
+    color: theme.colors.gray[400],
   },
 });

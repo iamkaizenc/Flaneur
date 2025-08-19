@@ -50,33 +50,7 @@ const PLATFORM_QUOTAS = {
   telegram: { daily: 10, maxLength: 4096 }
 };
 
-// Content templates by platform
-const CONTENT_TEMPLATES = {
-  x: {
-    structure: "{hook} {value} {cta}",
-    tone: "casual",
-    hashtags: "1-2",
-    length: "220 char hedef"
-  },
-  instagram: {
-    structure: "kısa caption + 3-5 hashtag",
-    tone: "visual-focused",
-    hashtags: "3-5",
-    length: "short caption"
-  },
-  linkedin: {
-    structure: "profesyonel ton + insight",
-    tone: "professional",
-    hashtags: "0-2",
-    length: "detailed post"
-  },
-  telegram: {
-    structure: "link/duyuru odaklı",
-    tone: "informative",
-    hashtags: "0-1",
-    length: "announcement style"
-  }
-};
+
 
 // Check if content contains banned words
 function checkBanwords(content: string): { isViolation: boolean; word?: string; friendlyMessage?: string } {
@@ -96,6 +70,46 @@ function checkBanwords(content: string): { isViolation: boolean; word?: string; 
   }
   
   return { isViolation: false };
+}
+
+// Generate media for content item using direct API call
+async function generateMediaForContent(
+  mediaPrompt: string,
+  platform: string
+): Promise<{ mediaUrl?: string; error?: string }> {
+  try {
+    // Call the image generation API directly
+    const response = await fetch('https://toolkit.rork.com/images/generate/', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        prompt: `Create a ${platform === 'instagram' ? 'lifestyle/product visual' : 
+                 platform === 'x' ? 'meme or quote visual' : 
+                 platform === 'telegram' ? 'banner or announcement poster' : 
+                 'corporate graphic or slide'} for ${platform} social media post. ${mediaPrompt}. Style: modern, clean, high-quality. Avoid text overlays unless specifically requested.`,
+        size: platform === 'telegram' ? '1024x1792' : '1024x1024'
+      })
+    });
+
+    if (!response.ok) {
+      throw new Error(`Image API error: ${response.status}`);
+    }
+
+    const data = await response.json();
+    
+    if (data.image?.base64Data) {
+      // Convert base64 to data URL
+      const mediaUrl = `data:${data.image.mimeType};base64,${data.image.base64Data}`;
+      return { mediaUrl };
+    } else {
+      return { error: 'No image data received' };
+    }
+  } catch (error) {
+    console.error('[Publish] Media generation error:', error);
+    return { error: error instanceof Error ? error.message : 'Media generation failed' };
+  }
 }
 
 // Generate AI content using external API
@@ -361,6 +375,21 @@ export const publishGenerateProcedure = publicProcedure
         const contentHash = Buffer.from(`${item.title}${item.body}`).toString('base64').slice(0, 8);
         const idempotencyKey = generateIdempotencyKey(item.platform, contentHash);
         
+        // Generate media if mediaPrompt exists and item is not held
+        let mediaUrl: string | undefined;
+        let mediaError: string | undefined;
+        
+        if (item.mediaPrompt && item.status === 'draft') {
+          console.log(`[Publish] Generating media for ${item.platform}: ${item.mediaPrompt}`);
+          const mediaResult = await generateMediaForContent(item.mediaPrompt, item.platform);
+          mediaUrl = mediaResult.mediaUrl;
+          mediaError = mediaResult.error;
+          
+          if (mediaError) {
+            console.warn(`[Publish] Media generation failed for ${item.platform}: ${mediaError}`);
+          }
+        }
+        
         // Create content item
         const contentItem = {
           id: `ai_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
@@ -369,6 +398,8 @@ export const publishGenerateProcedure = publicProcedure
           platform: item.platform,
           status: item.status,
           mediaPrompt: item.mediaPrompt,
+          mediaUrl,
+          mediaError,
           scheduledAt: item.scheduledAt,
           heldReason: item.heldReason,
           idempotencyKey,
@@ -404,6 +435,43 @@ export const publishGenerateProcedure = publicProcedure
         success: false,
         error: 'AI içerik üretiminde hata oluştu. Lütfen tekrar deneyin.',
         technicalError: error instanceof Error ? error.message : 'Unknown error'
+      };
+    }
+  });
+
+// Regenerate media for content item
+export const publishRegenerateMediaProcedure = publicProcedure
+  .input(z.object({
+    itemId: z.string(),
+    mediaPrompt: z.string().min(1).max(500),
+    platform: z.enum(["x", "instagram", "telegram", "linkedin"])
+  }))
+  .mutation(async ({ input }) => {
+    console.log(`[Publish] Regenerating media for ${input.itemId}:`, input.mediaPrompt);
+    
+    try {
+      const mediaResult = await generateMediaForContent(input.mediaPrompt, input.platform);
+      
+      if (mediaResult.error) {
+        return {
+          success: false,
+          error: mediaResult.error,
+          itemId: input.itemId
+        };
+      }
+      
+      return {
+        success: true,
+        mediaUrl: mediaResult.mediaUrl,
+        itemId: input.itemId,
+        message: 'Medya başarıyla yeniden oluşturuldu'
+      };
+    } catch (error) {
+      console.error('[Publish] Media regeneration error:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Medya yeniden oluşturulamadı',
+        itemId: input.itemId
       };
     }
   });

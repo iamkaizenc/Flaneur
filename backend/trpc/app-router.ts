@@ -39,7 +39,8 @@ import {
   riskResolveAlertProcedure, 
   riskSimulateAlertProcedure 
 } from "./routes/risk/route";
-import { publishGenerateProcedure, publishBatchQueueProcedure } from "./routes/publish/route";
+import { publishGenerateProcedure, publishBatchQueueProcedure, publishRegenerateMediaProcedure } from "./routes/publish/route";
+import { mediaGenerateProcedure, mediaBatchGenerateProcedure, mediaGetCacheStatsProcedure, mediaClearCacheProcedure } from "./routes/media/route";
 
 export const appRouter = createTRPCRouter({
   example: createTRPCRouter({
@@ -169,6 +170,13 @@ export const appRouter = createTRPCRouter({
   publish: createTRPCRouter({
     generate: publishGenerateProcedure,
     batchQueue: publishBatchQueueProcedure,
+    regenerateMedia: publishRegenerateMediaProcedure,
+  }),
+  media: createTRPCRouter({
+    generate: mediaGenerateProcedure,
+    batchGenerate: mediaBatchGenerateProcedure,
+    getCacheStats: mediaGetCacheStatsProcedure,
+    clearCache: mediaClearCacheProcedure,
   }),
 });
 
