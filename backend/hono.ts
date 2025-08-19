@@ -14,17 +14,25 @@ app.use("*", cors({
     const allowed = [
       "http://localhost:8081",
       "http://127.0.0.1:8081",
+      "http://localhost:3000",
+      "http://127.0.0.1:3000",
     ];
     if (allowed.includes(origin)) return origin;
     if (origin.startsWith("exp://")) return origin;
-    if (origin.match(/^http:\/\/192\.168\..+:8081$/)) return origin;
-    if (origin.match(/^http:\/\/10\..+:8081$/)) return origin;
-    if (origin.match(/^http:\/\/172\.(1[6-9]|2[0-9]|3[0-1])\..+:8081$/)) return origin;
+    if (origin.match(/^http:\/\/192\.168\..+:(8081|3000)$/)) return origin;
+    if (origin.match(/^http:\/\/10\..+:(8081|3000)$/)) return origin;
+    if (origin.match(/^http:\/\/172\.(1[6-9]|2[0-9]|3[0-1])\..+:(8081|3000)$/)) return origin;
     if (origin.match(/^https?:\/\/.*\.exp\.direct$/)) return origin;
     return null;
   },
   credentials: true,
 }));
+
+// Add error handling middleware
+app.onError((err, c) => {
+  console.error('[Hono] Server error:', err);
+  return c.json({ error: 'Internal server error', message: err.message }, 500);
+});
 
 // Health check endpoint
 app.get("/health", (c) => {
@@ -49,9 +57,11 @@ app.get("/version", (c) => {
 app.use(
   "/trpc/*",
   trpcServer({
-    endpoint: "/api/trpc",
     router: appRouter,
     createContext,
+    onError: ({ error, path }) => {
+      console.error(`[tRPC] Error on ${path}:`, error);
+    },
   })
 );
 
@@ -66,6 +76,11 @@ app.get("/", (c) => {
       trpc: "/api/trpc"
     }
   });
+});
+
+// Catch-all for unmatched routes
+app.notFound((c) => {
+  return c.json({ error: 'Not Found', path: c.req.path }, 404);
 });
 
 export default app;

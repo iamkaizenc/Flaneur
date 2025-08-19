@@ -178,7 +178,19 @@ const SimpleChart = ({ data }: { data: number[] }) => {
   );
 };
 
-const FameScoreBar = ({ score, tier }: { score: number; tier: string }) => {
+const FameScoreBar = ({ 
+  score, 
+  tier, 
+  breakdown, 
+  tooltip, 
+  insights 
+}: { 
+  score: number; 
+  tier: string; 
+  breakdown?: { reach: number; engagement: number; consistency: number; penalty: number };
+  tooltip?: string;
+  insights?: string[];
+}) => {
   const getBarColor = (score: number) => {
     if (score >= 86) return '#10B981'; // Yıldız - Green
     if (score >= 61) return '#F59E0B'; // Parlıyor - Amber
@@ -195,9 +207,13 @@ const FameScoreBar = ({ score, tier }: { score: number; tier: string }) => {
         <View style={styles.fameScoreInfo}>
           <Text style={styles.fameScoreTitle}>Ünlüleşme Skoru</Text>
           <Text style={styles.fameScoreTier}>{tier}</Text>
+          {tooltip && (
+            <Text style={styles.fameScoreTooltip}>{tooltip}</Text>
+          )}
         </View>
         <Text style={styles.fameScoreValue}>{score}</Text>
       </View>
+      
       <View style={styles.fameScoreBarContainer}>
         <View style={styles.fameScoreBarBackground}>
           <View 
@@ -218,26 +234,79 @@ const FameScoreBar = ({ score, tier }: { score: number; tier: string }) => {
           <Text style={styles.fameScoreLabel}>100</Text>
         </View>
       </View>
+
+      {breakdown && (
+        <View style={styles.fameScoreBreakdown}>
+          <Text style={styles.fameScoreBreakdownTitle}>Katkı Analizi</Text>
+          <View style={styles.fameScoreBreakdownItems}>
+            <View style={styles.fameScoreBreakdownItem}>
+              <View style={[styles.fameScoreBreakdownDot, { backgroundColor: '#3B82F6' }]} />
+              <Text style={styles.fameScoreBreakdownLabel}>Erişim</Text>
+              <Text style={styles.fameScoreBreakdownValue}>%{breakdown.reach}</Text>
+            </View>
+            <View style={styles.fameScoreBreakdownItem}>
+              <View style={[styles.fameScoreBreakdownDot, { backgroundColor: '#10B981' }]} />
+              <Text style={styles.fameScoreBreakdownLabel}>Etkileşim</Text>
+              <Text style={styles.fameScoreBreakdownValue}>%{breakdown.engagement}</Text>
+            </View>
+            <View style={styles.fameScoreBreakdownItem}>
+              <View style={[styles.fameScoreBreakdownDot, { backgroundColor: '#F59E0B' }]} />
+              <Text style={styles.fameScoreBreakdownLabel}>Tutarlılık</Text>
+              <Text style={styles.fameScoreBreakdownValue}>%{breakdown.consistency}</Text>
+            </View>
+          </View>
+        </View>
+      )}
+
+      {insights && insights.length > 0 && (
+        <View style={styles.fameScoreInsights}>
+          <Text style={styles.fameScoreInsightsTitle}>Anlık Durumlar</Text>
+          {insights.slice(0, 3).map((insight, index) => (
+            <View key={index} style={styles.fameScoreInsightItem}>
+              <Text style={styles.fameScoreInsightText}>{insight}</Text>
+            </View>
+          ))}
+        </View>
+      )}
     </View>
   );
 };
 
 const FameScoreTrend = ({ trend }: { trend: Array<{ date: string; score: number }> }) => {
-  if (!trend || trend.length === 0) return null;
+  if (!trend || trend.length === 0) {
+    return (
+      <View style={styles.fameScoreTrendContainer}>
+        <Text style={styles.fameScoreTrendTitle}>Son 30 Gün Trendi</Text>
+        <View style={styles.fameScoreTrendEmpty}>
+          <Text style={styles.fameScoreTrendEmptyText}>Veri yok</Text>
+        </View>
+      </View>
+    );
+  }
 
   const maxScore = Math.max(...trend.map(t => t.score));
   const minScore = Math.min(...trend.map(t => t.score));
   const range = maxScore - minScore;
 
+  // Show only last 30 points for better visualization
+  const displayTrend = trend.slice(-30);
+
   return (
     <View style={styles.fameScoreTrendContainer}>
-      <Text style={styles.fameScoreTrendTitle}>Son 7 Gün Trendi</Text>
+      <Text style={styles.fameScoreTrendTitle}>Son 30 Gün Trendi</Text>
       <View style={styles.fameScoreTrendChart}>
-        {trend.map((item, index) => {
+        {displayTrend.map((item, index) => {
           const height = range > 0 ? ((item.score - minScore) / range) * 40 + 5 : 22;
+          const isRecent = index >= displayTrend.length - 7; // Highlight last 7 days
           return (
             <View key={index} style={styles.fameScoreTrendBarContainer}>
-              <View style={[styles.fameScoreTrendBar, { height }]} />
+              <View style={[
+                styles.fameScoreTrendBar, 
+                { 
+                  height,
+                  backgroundColor: isRecent ? '#3B82F6' : theme.colors.gray[400]
+                }
+              ]} />
             </View>
           );
         })}
@@ -752,7 +821,10 @@ export default function GrowthScreen() {
           <View style={styles.fameScoreCard}>
             <FameScoreBar 
               score={fameScoreQuery.data.score} 
-              tier={fameScoreQuery.data.tier} 
+              tier={fameScoreQuery.data.tier}
+              breakdown={fameScoreQuery.data.breakdown}
+              tooltip={fameScoreQuery.data.tooltip}
+              insights={fameScoreQuery.data.insights}
             />
             <FameScoreTrend trend={fameScoreQuery.data.trend} />
           </View>
@@ -1256,6 +1328,18 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.gray[400],
     borderRadius: 1,
     width: "70%",
+  },
+  fameScoreTrendEmpty: {
+    height: 50,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: theme.colors.gray[100],
+    borderRadius: theme.borderRadius.md,
+  },
+  fameScoreTrendEmptyText: {
+    fontSize: 12,
+    color: theme.colors.gray[500],
+    fontStyle: "italic" as const,
   },
   badgesSection: {
     marginBottom: theme.spacing.lg,
@@ -1894,5 +1978,71 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: "600" as const,
     color: theme.colors.black,
+  },
+  // FameScore enhanced styles
+  fameScoreTooltip: {
+    fontSize: 10,
+    color: theme.colors.gray[400],
+    marginTop: 2,
+    fontStyle: "italic" as const,
+  },
+  fameScoreBreakdown: {
+    marginTop: 16,
+    paddingTop: 16,
+    borderTopWidth: 1,
+    borderTopColor: theme.colors.gray[200],
+  },
+  fameScoreBreakdownTitle: {
+    fontSize: 14,
+    fontWeight: "600" as const,
+    color: theme.colors.black,
+    marginBottom: 12,
+  },
+  fameScoreBreakdownItems: {
+    gap: 8,
+  },
+  fameScoreBreakdownItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  fameScoreBreakdownDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  fameScoreBreakdownLabel: {
+    fontSize: 12,
+    color: theme.colors.gray[600],
+    flex: 1,
+  },
+  fameScoreBreakdownValue: {
+    fontSize: 12,
+    fontWeight: "600" as const,
+    color: theme.colors.black,
+  },
+  fameScoreInsights: {
+    marginTop: 16,
+    paddingTop: 16,
+    borderTopWidth: 1,
+    borderTopColor: theme.colors.gray[200],
+  },
+  fameScoreInsightsTitle: {
+    fontSize: 14,
+    fontWeight: "600" as const,
+    color: theme.colors.black,
+    marginBottom: 8,
+  },
+  fameScoreInsightItem: {
+    backgroundColor: theme.colors.gray[50],
+    borderRadius: theme.borderRadius.md,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    marginBottom: 6,
+  },
+  fameScoreInsightText: {
+    fontSize: 12,
+    color: theme.colors.gray[700],
+    lineHeight: 16,
   },
 });

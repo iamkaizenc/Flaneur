@@ -282,129 +282,142 @@ const getOAuthUrl = (platform: string, state: string): string => {
 export const oauthStartProcedure = publicProcedure
   .input(oauthStartInputSchema)
   .mutation(async ({ input }) => {
-    console.log(`[OAuth] Starting OAuth flow for ${input.platform}`);
-    
-    const isLiveMode = process.env.LIVE_MODE === "true";
-    
-    if (input.platform === "telegram") {
+    try {
+      console.log(`[OAuth] Starting OAuth flow for ${input.platform}`);
+      
+      const isLiveMode = process.env.LIVE_MODE === "true";
+      
+      if (input.platform === "telegram") {
+        return {
+          requiresBotToken: true,
+          message: "Telegram requires a bot token instead of OAuth.",
+          instructions: "1. Create a bot via @BotFather\n2. Get your bot token\n3. Add the token in Settings > Connections",
+          authUrl: null
+        };
+      }
+      
+      const state = Math.random().toString(36).substring(2, 15);
+      const authUrl = getOAuthUrl(input.platform, state);
+      
+      if (!isLiveMode) {
+        console.log(`[OAuth] DRY_RUN mode - would redirect to: ${authUrl}`);
+      }
+      
       return {
-        requiresBotToken: true,
-        message: "Telegram requires a bot token instead of OAuth.",
-        instructions: "1. Create a bot via @BotFather\n2. Get your bot token\n3. Add the token in Settings > Connections",
-        authUrl: null
+        requiresBotToken: false,
+        authUrl,
+        message: `Redirecting to ${input.platform} for authorization`,
+        state
       };
+    } catch (error) {
+      console.error(`[OAuth] Start error:`, error);
+      throw new AuthError(`Failed to start OAuth flow: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
-    
-    const state = Math.random().toString(36).substring(2, 15);
-    const authUrl = getOAuthUrl(input.platform, state);
-    
-    if (!isLiveMode) {
-      console.log(`[OAuth] DRY_RUN mode - would redirect to: ${authUrl}`);
-    }
-    
-    return {
-      requiresBotToken: false,
-      authUrl,
-      message: `Redirecting to ${input.platform} for authorization`,
-      state
-    };
   });
 
 export const oauthCallbackProcedure = publicProcedure
   .input(oauthCallbackInputSchema)
   .mutation(async ({ input }) => {
-    console.log(`[OAuth] Processing callback for ${input.platform}:`, input);
-    
-    if (input.error) {
-      throw new AuthError(`OAuth error: ${input.error}`, input.platform);
-    }
-    
-    if (!input.code && input.platform !== "telegram") {
-      throw new ValidationError("Authorization code is required", "code");
-    }
-    
-    const isLiveMode = process.env.LIVE_MODE === "true";
-    
-    if (!isLiveMode) {
-      // Simulate successful OAuth in DRY_RUN mode
-      console.log(`[OAuth] DRY_RUN mode - simulating successful connection for ${input.platform}`);
-      
-      const mockAccount = {
-        id: `mock_${input.platform}_${Date.now()}`,
-        userId: "demo_user_id",
-        platform: input.platform,
-        handle: `@demo_${input.platform}_user`,
-        displayName: `Demo ${input.platform.charAt(0).toUpperCase() + input.platform.slice(1)} User`,
-        accessToken: encrypt("mock_access_token"),
-        refreshToken: encrypt("mock_refresh_token"),
-        tokenExpiresAt: new Date(Date.now() + 3600000).toISOString(),
-        scopes: ["read", "write"],
-        status: "connected" as const,
-        lastRefresh: new Date().toISOString(),
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
-      };
-      
-      // Store in mock database
-      const existingIndex = socialAccounts.findIndex(acc => acc.platform === input.platform && acc.userId === "demo_user_id");
-      if (existingIndex >= 0) {
-        socialAccounts[existingIndex] = mockAccount;
-      } else {
-        socialAccounts.push(mockAccount);
-      }
-      
-      return {
-        success: true,
-        message: `Successfully connected ${input.platform} account (DRY_RUN mode)`,
-        account: {
-          ...mockAccount,
-          accessToken: "[encrypted]",
-          refreshToken: "[encrypted]"
-        }
-      };
-    }
-    
-    // LIVE mode OAuth implementation
     try {
-      const tokenData = await exchangeCodeForToken(input.platform, input.code!);
-      const userProfile = await fetchUserProfile(input.platform, tokenData.access_token);
+      console.log(`[OAuth] Processing callback for ${input.platform}:`, input);
       
-      const account = {
-        id: `${input.platform}_${userProfile.id}_${Date.now()}`,
-        userId: "current_user_id", // In production, get from session
-        platform: input.platform,
-        handle: userProfile.handle,
-        displayName: userProfile.displayName,
-        accessToken: encrypt(tokenData.access_token),
-        refreshToken: tokenData.refresh_token ? encrypt(tokenData.refresh_token) : undefined,
-        tokenExpiresAt: tokenData.expires_at,
-        scopes: tokenData.scope?.split(' ') || [],
-        status: "connected" as const,
-        lastRefresh: new Date().toISOString(),
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
-      };
-      
-      // Store in database
-      const existingIndex = socialAccounts.findIndex(acc => acc.platform === input.platform && acc.userId === account.userId);
-      if (existingIndex >= 0) {
-        socialAccounts[existingIndex] = account;
-      } else {
-        socialAccounts.push(account);
+      if (input.error) {
+        throw new AuthError(`OAuth error: ${input.error}`);
       }
       
-      return {
-        success: true,
-        message: `Successfully connected ${input.platform} account`,
-        account: {
-          ...account,
-          accessToken: "[encrypted]",
-          refreshToken: "[encrypted]"
+      if (!input.code && input.platform !== "telegram") {
+        throw new ValidationError("Authorization code is required");
+      }
+      
+      const isLiveMode = process.env.LIVE_MODE === "true";
+      
+      if (!isLiveMode) {
+        // Simulate successful OAuth in DRY_RUN mode
+        console.log(`[OAuth] DRY_RUN mode - simulating successful connection for ${input.platform}`);
+        
+        const mockAccount = {
+          id: `mock_${input.platform}_${Date.now()}`,
+          userId: "demo_user_id",
+          platform: input.platform,
+          handle: `@demo_${input.platform}_user`,
+          displayName: `Demo ${input.platform.charAt(0).toUpperCase() + input.platform.slice(1)} User`,
+          accessToken: encrypt("mock_access_token"),
+          refreshToken: encrypt("mock_refresh_token"),
+          tokenExpiresAt: new Date(Date.now() + 3600000).toISOString(),
+          scopes: ["read", "write"],
+          status: "connected" as const,
+          lastRefresh: new Date().toISOString(),
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString()
+        };
+        
+        // Store in mock database
+        const existingIndex = socialAccounts.findIndex(acc => acc.platform === input.platform && acc.userId === "demo_user_id");
+        if (existingIndex >= 0) {
+          socialAccounts[existingIndex] = mockAccount;
+        } else {
+          socialAccounts.push(mockAccount);
         }
-      };
+        
+        return {
+          success: true,
+          message: `Successfully connected ${input.platform} account (DRY_RUN mode)`,
+          account: {
+            ...mockAccount,
+            accessToken: "[encrypted]",
+            refreshToken: "[encrypted]"
+          }
+        };
+      }
+      
+      // LIVE mode OAuth implementation
+      try {
+        const tokenData = await exchangeCodeForToken(input.platform, input.code!);
+        const userProfile = await fetchUserProfile(input.platform, tokenData.access_token);
+        
+        const account = {
+          id: `${input.platform}_${userProfile.id}_${Date.now()}`,
+          userId: "current_user_id", // In production, get from session
+          platform: input.platform,
+          handle: userProfile.handle,
+          displayName: userProfile.displayName,
+          accessToken: encrypt(tokenData.access_token),
+          refreshToken: tokenData.refresh_token ? encrypt(tokenData.refresh_token) : undefined,
+          tokenExpiresAt: tokenData.expires_at,
+          scopes: tokenData.scope?.split(' ') || [],
+          status: "connected" as const,
+          lastRefresh: new Date().toISOString(),
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString()
+        };
+        
+        // Store in database
+        const existingIndex = socialAccounts.findIndex(acc => acc.platform === input.platform && acc.userId === account.userId);
+        if (existingIndex >= 0) {
+          socialAccounts[existingIndex] = account;
+        } else {
+          socialAccounts.push(account);
+        }
+        
+        return {
+          success: true,
+          message: `Successfully connected ${input.platform} account`,
+          account: {
+            ...account,
+            accessToken: "[encrypted]",
+            refreshToken: "[encrypted]"
+          }
+        };
+      } catch (error) {
+        console.error(`[OAuth] Failed to connect ${input.platform}:`, error);
+        throw new AuthError(`Failed to connect ${input.platform}: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      }
     } catch (error) {
-      console.error(`[OAuth] Failed to connect ${input.platform}:`, error);
-      throw new AuthError(`Failed to connect ${input.platform}: ${error instanceof Error ? error.message : 'Unknown error'}`, input.platform);
+      console.error(`[OAuth] Callback error:`, error);
+      if (error instanceof AuthError || error instanceof ValidationError) {
+        throw error;
+      }
+      throw new AuthError(`OAuth callback failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   });
 

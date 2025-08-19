@@ -6,6 +6,14 @@ export interface FameScoreInputs {
   followerGrowth: number; // % change in followers
 }
 
+export interface FameScoreHistory {
+  date: string;
+  score: number;
+  reach: number;
+  engagement: number;
+  consistency: number;
+}
+
 export interface FameScoreResult {
   score: number; // 0-100
   tier: string;
@@ -14,13 +22,20 @@ export interface FameScoreResult {
     frequency: number;
     growth: number;
   };
+  breakdown?: {
+    reach: number;
+    engagement: number;
+    consistency: number;
+    penalty: number;
+  };
+  insights?: string[];
 }
 
 export class FameScoreService {
   private static readonly WEIGHTS = {
-    engagement: 0.5,
-    frequency: 0.3,
-    growth: 0.2
+    reach: 0.4,
+    engagement: 0.35,
+    consistency: 0.25
   };
 
   private static readonly TIERS = [
@@ -33,36 +48,49 @@ export class FameScoreService {
   static calculateFameScore(inputs: FameScoreInputs): FameScoreResult {
     console.log('Calculating FameScore with inputs:', inputs);
 
+    // Normalize reach (impressions/followers ratio, 0-10 -> 0-100)
+    const reachRatio = inputs.engagementRate * 0.1; // Simplified reach calculation
+    const normalizedReach = Math.min(100, Math.max(0, reachRatio * 10));
+
     // Normalize engagement rate (already 0-100)
     const normalizedEngagement = Math.min(100, Math.max(0, inputs.engagementRate));
 
-    // Normalize post frequency (0-21 posts/week -> 0-100)
-    const normalizedFrequency = Math.min(100, (inputs.postFrequency / 21) * 100);
+    // Normalize consistency (post frequency with penalty for gaps)
+    const optimalFrequency = 7; // 1 post per day
+    const frequencyScore = Math.min(100, (inputs.postFrequency / optimalFrequency) * 100);
+    const consistencyBonus = inputs.postFrequency >= 3 ? 10 : 0; // Bonus for regular posting
+    const normalizedConsistency = Math.min(100, frequencyScore + consistencyBonus);
 
-    // Normalize follower growth (-100% to +500% -> 0-100)
-    const normalizedGrowth = Math.min(100, Math.max(0, ((inputs.followerGrowth + 100) / 600) * 100));
+    // Apply penalties
+    let penalty = 0;
+    if (inputs.followerGrowth < -10) penalty += 15; // Significant follower loss
+    if (inputs.postFrequency < 1) penalty += 20; // Very low posting frequency
 
     const normalizedInputs = {
+      reach: normalizedReach,
       engagement: normalizedEngagement,
-      frequency: normalizedFrequency,
-      growth: normalizedGrowth
+      consistency: normalizedConsistency
     };
 
-    // Calculate weighted score
-    const score = Math.round(
+    // Calculate weighted score with penalty
+    const rawScore = 
+      normalizedReach * this.WEIGHTS.reach +
       normalizedEngagement * this.WEIGHTS.engagement +
-      normalizedFrequency * this.WEIGHTS.frequency +
-      normalizedGrowth * this.WEIGHTS.growth
-    );
-
+      normalizedConsistency * this.WEIGHTS.consistency;
+    
+    const score = Math.round(Math.max(0, Math.min(100, rawScore - penalty)));
     const tier = this.getTier(score);
 
-    console.log('FameScore calculated:', { score, tier, normalizedInputs });
+    console.log('FameScore calculated:', { score, tier, normalizedInputs, penalty });
 
     return {
       score,
       tier,
-      normalizedInputs
+      normalizedInputs: {
+        engagement: normalizedEngagement,
+        frequency: normalizedConsistency,
+        growth: normalizedReach
+      }
     };
   }
 
@@ -98,6 +126,34 @@ export class FameScoreService {
   }
 
   static getProgressNotificationText(score: number): string {
-    return `🔥 Ünlüleşme Skorun ${score} oldu! Sahne ışıkları sana dönüyor.`;
+    if (score >= 86) return `🌟 Yıldız seviyesine ulaştın! Skorun: ${score}`;
+    if (score >= 61) return `✨ Parlıyorsun! FameScore: ${score}`;
+    if (score >= 31) return `📈 Yükselişte! Skorun: ${score}`;
+    return `🚀 Başlangıç yolculuğun devam ediyor! Skorun: ${score}`;
+  }
+
+  static getInsightBadges(currentScore: number, previousScore: number, metrics: any): string[] {
+    const badges: string[] = [];
+    
+    const weeklyChange = currentScore - previousScore;
+    if (weeklyChange > 5) badges.push("🔼 Takipçi artışın hızlandı");
+    if (weeklyChange < -5) badges.push("🔽 Son 7 gün etkileşim düştü");
+    if (metrics.postFrequency < 3) badges.push("⏸️ Az paylaşım yaptın, tutarlılık düşük");
+    if (metrics.engagementRate > 5) badges.push("💫 Etkileşim oranın harika!");
+    if (currentScore >= 86) badges.push("👑 Yıldız performansı!");
+    
+    return badges;
+  }
+
+  static getBreakdownPercentages(normalizedInputs: any): { reach: number; engagement: number; consistency: number; penalty: number } {
+    const total = normalizedInputs.engagement + normalizedInputs.frequency + normalizedInputs.growth;
+    if (total === 0) return { reach: 0, engagement: 0, consistency: 0, penalty: 0 };
+    
+    return {
+      reach: Math.round((normalizedInputs.growth / total) * 100),
+      engagement: Math.round((normalizedInputs.engagement / total) * 100),
+      consistency: Math.round((normalizedInputs.frequency / total) * 100),
+      penalty: 0 // Calculate penalty percentage if needed
+    };
   }
 }
