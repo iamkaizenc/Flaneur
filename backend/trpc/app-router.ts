@@ -19,7 +19,17 @@ import { getPostingWindowProcedure, updatePostingWindowProcedure, isWithinPostin
 import { getTraceLogsProcedure, addTraceLogProcedure, getTraceLogsSummaryProcedure, getSystemTraceLogsProcedure, clearOldTraceLogsProcedure } from "./routes/traces/route";
 import { getAdsProcedure, trackAdImpressionProcedure, trackAdClickProcedure, getAdStatsProcedure, updateAdSettingsProcedure, getPaywallContentProcedure } from "./routes/ads/route";
 import { fameScoreProcedure, fameScoreHistoryProcedure } from "./routes/fame-score/route";
-import { sendNotificationProcedure, scheduleNotificationProcedure, getNotificationHistoryProcedure, sendFameProgressNotificationProcedure } from "./routes/notifications/route";
+import { 
+  sendNotificationProcedure, 
+  scheduleNotificationProcedure, 
+  getNotificationHistoryProcedure, 
+  sendFameProgressNotificationProcedure,
+  subscribeNotificationsProcedure,
+  testNotificationProcedure,
+  webhookRegisterProcedure,
+  webhookListProcedure,
+  webhookDeleteProcedure
+} from "./routes/notifications/route";
 import { badgesProcedure, streakProcedure } from "./routes/badges/route";
 import { weeklyChallengesProcedure, updateChallengeProcedure, claimBonusProcedure } from "./routes/challenges/route";
 import { createOnboardingProcedure, getOnboardingProcedure } from "./routes/onboarding/route";
@@ -41,6 +51,15 @@ import {
 } from "./routes/risk/route";
 import { publishGenerateProcedure, publishBatchQueueProcedure, publishRegenerateMediaProcedure, publishGetMediaUsageProcedure, publishUploadMediaProcedure } from "./routes/publish/route";
 import { mediaGenerateProcedure, mediaBatchGenerateProcedure, mediaGetCacheStatsProcedure, mediaClearCacheProcedure } from "./routes/media/route";
+import { 
+  queueJobProcedure,
+  runNowProcedure,
+  rescheduleProcedure,
+  cancelJobProcedure,
+  listJobsProcedure,
+  getJobStatsProcedure,
+  workerTickProcedure
+} from "./routes/scheduler/route";
 
 export const appRouter = createTRPCRouter({
   example: createTRPCRouter({
@@ -136,6 +155,13 @@ export const appRouter = createTRPCRouter({
     schedule: scheduleNotificationProcedure,
     history: getNotificationHistoryProcedure,
     sendFameProgress: sendFameProgressNotificationProcedure,
+    subscribe: subscribeNotificationsProcedure,
+    test: testNotificationProcedure,
+  }),
+  webhooks: createTRPCRouter({
+    register: webhookRegisterProcedure,
+    list: webhookListProcedure,
+    delete: webhookDeleteProcedure,
   }),
   badges: createTRPCRouter({
     list: badgesProcedure,
@@ -180,6 +206,15 @@ export const appRouter = createTRPCRouter({
     batchGenerate: mediaBatchGenerateProcedure,
     getCacheStats: mediaGetCacheStatsProcedure,
     clearCache: mediaClearCacheProcedure,
+  }),
+  scheduler: createTRPCRouter({
+    queue: queueJobProcedure,
+    runNow: runNowProcedure,
+    reschedule: rescheduleProcedure,
+    cancel: cancelJobProcedure,
+    list: listJobsProcedure,
+    stats: getJobStatsProcedure,
+    workerTick: workerTickProcedure,
   }),
 });
 

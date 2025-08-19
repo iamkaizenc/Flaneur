@@ -50,7 +50,7 @@ import {
   Minus,
 } from "lucide-react-native";
 import { theme, brandName } from "@/constants/theme";
-import { trpc } from "@/lib/trpc";
+import { trpc, trpcClient } from "@/lib/trpc";
 import { usePurchase } from "@/hooks/usePurchase";
 import { LanguagePicker } from "../../src/components/LanguagePicker";
 
@@ -1034,7 +1034,7 @@ export default function SettingsScreen() {
         </View>
 
         {/* Notifications Section */}
-        <SectionHeader title="Notifications" icon={<Bell size={20} color={theme.colors.white} />} />
+        <SectionHeader title="Notifications & Webhooks" icon={<Bell size={20} color={theme.colors.white} />} />
         <View style={styles.section}>
           <SettingItem
             title="Email Notifications"
@@ -1053,6 +1053,53 @@ export default function SettingsScreen() {
               rightElement={<Send size={16} color={theme.colors.gray[400]} />}
             />
           )}
+          <SettingItem
+            title="Test Push Notification"
+            subtitle="Test push notification system"
+            onPress={async () => {
+              try {
+                const result = await trpcClient.notifications.test.mutate({
+                  userId: "demo_user",
+                  channel: "push"
+                });
+                Alert.alert("Success", result.message);
+              } catch (error) {
+                Alert.alert("Error", "Failed to send test notification");
+              }
+            }}
+            rightElement={<Bell size={16} color={theme.colors.gray[400]} />}
+          />
+          <SettingItem
+            title="Webhook Management"
+            subtitle="Configure webhook endpoints"
+            onPress={() => {
+              Alert.alert(
+                "Webhook Demo",
+                "Register a webhook endpoint to receive real-time notifications",
+                [
+                  { text: "Cancel", style: "cancel" },
+                  {
+                    text: "Register Demo Webhook",
+                    onPress: async () => {
+                      try {
+                        const result = await trpcClient.webhooks.register.mutate({
+                          userId: "demo_user",
+                          url: "https://webhook.site/demo",
+                          secret: "demo_secret_key_123",
+                          events: ["content.published", "content.held", "content.error"],
+                          name: "Demo Webhook"
+                        });
+                        Alert.alert("Success", result.message);
+                      } catch (error) {
+                        Alert.alert("Error", "Failed to register webhook");
+                      }
+                    }
+                  }
+                ]
+              );
+            }}
+            rightElement={<Globe size={16} color={theme.colors.gray[400]} />}
+          />
         </View>
 
         {/* Branding Section */}
@@ -1090,6 +1137,65 @@ export default function SettingsScreen() {
           </View>
         </View>
 
+        {/* Scheduler Section */}
+        <SectionHeader title="Scheduler & Jobs" icon={<Clock size={20} color={theme.colors.white} />} />
+        <View style={styles.section}>
+          <SettingItem
+            title="Queue Demo Job"
+            subtitle="Add a test job to the scheduler"
+            onPress={async () => {
+              try {
+                const runAt = new Date(Date.now() + 60000); // 1 minute from now
+                const result = await trpcClient.scheduler.queue.mutate({
+                  contentId: `demo_content_${Date.now()}`,
+                  userId: "demo_user",
+                  platform: "x",
+                  runAt
+                });
+                Alert.alert(
+                  "Job Queued",
+                  `Job ${result.job?.id} scheduled for ${runAt.toLocaleTimeString()}`
+                );
+              } catch (error) {
+                Alert.alert("Error", "Failed to queue job");
+              }
+            }}
+            rightElement={<Plus size={16} color={theme.colors.gray[400]} />}
+          />
+          <SettingItem
+            title="Worker Tick"
+            subtitle="Manually trigger job processing"
+            onPress={async () => {
+              try {
+                const result = await trpcClient.scheduler.workerTick.mutate();
+                Alert.alert(
+                  "Worker Tick Complete",
+                  result.message
+                );
+              } catch (error) {
+                Alert.alert("Error", "Failed to trigger worker");
+              }
+            }}
+            rightElement={<RefreshCw size={16} color={theme.colors.gray[400]} />}
+          />
+          <SettingItem
+            title="Job Statistics"
+            subtitle="View scheduler statistics"
+            onPress={async () => {
+              try {
+                const stats = await trpcClient.scheduler.stats.query();
+                Alert.alert(
+                  "Job Statistics",
+                  `Total: ${stats.total}\nPending: ${stats.pending}\nCompleted: ${stats.completed}\nFailed: ${stats.failed}\nSuccess Rate: ${stats.recentActivity.successRate.toFixed(1)}%`
+                );
+              } catch (error) {
+                Alert.alert("Error", "Failed to fetch statistics");
+              }
+            }}
+            rightElement={<BarChart3 size={16} color={theme.colors.gray[400]} />}
+          />
+        </View>
+
         {/* Developer Section */}
         <SectionHeader title="Developer" icon={<Code size={20} color={theme.colors.white} />} />
         <View style={styles.section}>
@@ -1110,6 +1216,25 @@ export default function SettingsScreen() {
               // Trigger manual cron jobs for testing
               Alert.alert("Cron Jobs", "Manual trigger started (DRY_RUN mode)");
             }}
+          />
+          <SettingItem
+            title="Notification History"
+            subtitle="View recent notifications"
+            onPress={async () => {
+              try {
+                const history = await trpcClient.notifications.history.query({ userId: "demo_user", limit: 5 });
+                const recentNotifications = history.notifications
+                  .map((n: any) => `${n.title} (${new Date(n.sentAt).toLocaleDateString()})`)
+                  .join('\n');
+                Alert.alert(
+                  "Recent Notifications",
+                  recentNotifications || "No notifications found"
+                );
+              } catch (error) {
+                Alert.alert("Error", "Failed to fetch notification history");
+              }
+            }}
+            rightElement={<Activity size={16} color={theme.colors.gray[400]} />}
           />
         </View>
 
