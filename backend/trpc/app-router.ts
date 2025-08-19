@@ -39,7 +39,7 @@ import {
   riskResolveAlertProcedure, 
   riskSimulateAlertProcedure 
 } from "./routes/risk/route";
-import { publishGenerateProcedure, publishBatchQueueProcedure, publishRegenerateMediaProcedure } from "./routes/publish/route";
+import { publishGenerateProcedure, publishBatchQueueProcedure, publishRegenerateMediaProcedure, publishGetMediaUsageProcedure, publishUploadMediaProcedure } from "./routes/publish/route";
 import { mediaGenerateProcedure, mediaBatchGenerateProcedure, mediaGetCacheStatsProcedure, mediaClearCacheProcedure } from "./routes/media/route";
 
 export const appRouter = createTRPCRouter({
@@ -172,6 +172,8 @@ export const appRouter = createTRPCRouter({
     generate: publishGenerateProcedure,
     batchQueue: publishBatchQueueProcedure,
     regenerateMedia: publishRegenerateMediaProcedure,
+    getMediaUsage: publishGetMediaUsageProcedure,
+    uploadMedia: publishUploadMediaProcedure,
   }),
   media: createTRPCRouter({
     generate: mediaGenerateProcedure,

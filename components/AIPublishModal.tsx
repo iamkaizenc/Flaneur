@@ -175,7 +175,18 @@ export const AIPublishModal: React.FC<AIPublishModalProps> = ({
           )
         );
       } else {
-        Alert.alert('Hata', result.error || 'Medya yeniden oluşturulamadı');
+        if ((result as any).quotaExceeded) {
+          Alert.alert(
+            'Kota Doldu',
+            result.error,
+            [
+              { text: 'Tamam', style: 'cancel' },
+              { text: 'Planları Gör', onPress: () => {/* Navigate to plans */} }
+            ]
+          );
+        } else {
+          Alert.alert('Hata', result.error || 'Medya yeniden oluşturulamadı');
+        }
       }
     } catch (error) {
       console.error('Regenerate media error:', error);
@@ -401,7 +412,7 @@ export const AIPublishModal: React.FC<AIPublishModalProps> = ({
               <View style={styles.mediaSection}>
                 <View style={styles.mediaHeader}>
                   <ImageIcon size={14} color={theme.colors.gray[400]} />
-                  <Text style={styles.mediaLabel}>Medya</Text>
+                  <Text style={styles.mediaLabel}>AI Görsel</Text>
                   {item.mediaPrompt && (
                     <TouchableOpacity
                       style={styles.regenerateButton}
@@ -434,12 +445,30 @@ export const AIPublishModal: React.FC<AIPublishModalProps> = ({
                   <View style={styles.mediaError}>
                     <AlertCircle size={16} color={theme.colors.warning} />
                     <Text style={styles.mediaErrorText}>{item.mediaError}</Text>
+                    {item.mediaError.includes('kota') && (
+                      <TouchableOpacity 
+                        style={styles.upgradeButton}
+                        onPress={() => {/* Navigate to plans */}}
+                      >
+                        <Text style={styles.upgradeButtonText}>Yükselt</Text>
+                      </TouchableOpacity>
+                    )}
                   </View>
                 ) : (
                   <View style={styles.mediaLoading}>
                     <ActivityIndicator size="small" color={theme.colors.gray[400]} />
-                    <Text style={styles.mediaLoadingText}>Görsel oluşturuluyor...</Text>
+                    <Text style={styles.mediaLoadingText}>AI görsel oluşturuluyor...</Text>
                   </View>
+                )}
+                
+                {!item.mediaUrl && !item.mediaError && (
+                  <TouchableOpacity 
+                    style={styles.addMediaButton}
+                    onPress={() => {/* Handle manual media upload */}}
+                  >
+                    <ImageIcon size={16} color={theme.colors.gray[400]} />
+                    <Text style={styles.addMediaText}>Görsel ekle</Text>
+                  </TouchableOpacity>
                 )}
               </View>
             )}
@@ -890,6 +919,34 @@ const styles = StyleSheet.create({
   },
   mediaLoadingText: {
     fontSize: 10,
+    color: theme.colors.gray[400],
+  },
+  upgradeButton: {
+    marginLeft: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    backgroundColor: theme.colors.white,
+    borderRadius: 4,
+  },
+  upgradeButtonText: {
+    fontSize: 10,
+    color: theme.colors.black,
+    fontWeight: '600' as const,
+  },
+  addMediaButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: theme.colors.gray[600],
+    borderStyle: 'dashed',
+    borderRadius: 6,
+    marginTop: 8,
+  },
+  addMediaText: {
+    fontSize: 11,
     color: theme.colors.gray[400],
   },
 });

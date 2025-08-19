@@ -9,6 +9,7 @@ interface GeneratedContent {
   title: string;
   body: string;
   mediaPrompt?: string;
+  mediaUrl?: string;
   scheduledAt?: string;
   heldReason?: string;
 }
@@ -50,6 +51,17 @@ const PLATFORM_QUOTAS = {
   telegram: { daily: 10, maxLength: 4096 }
 };
 
+// AI Media quotas by plan
+const AI_MEDIA_QUOTAS = {
+  free: { daily: 0, monthly: 0 },
+  premium: { daily: 5, monthly: 100 },
+  platinum: { daily: -1, monthly: -1 } // unlimited
+};
+
+// Simple in-memory storage for media assets and usage tracking
+const mediaAssets = new Map<string, any>();
+const dailyMediaUsage = new Map<string, { date: string; count: number }>();
+
 
 
 // Check if content contains banned words
@@ -72,12 +84,89 @@ function checkBanwords(content: string): { isViolation: boolean; word?: string; 
   return { isViolation: false };
 }
 
+// Check AI media quota
+function checkAIMediaQuota(userPlan: string, userId: string): { allowed: boolean; reason?: string } {
+  const quota = AI_MEDIA_QUOTAS[userPlan as keyof typeof AI_MEDIA_QUOTAS];
+  if (!quota) {
+    return { allowed: false, reason: 'Geçersiz plan' };
+  }
+
+  // Unlimited for platinum
+  if (quota.daily === -1) {
+    return { allowed: true };
+  }
+
+  // Free plan has no AI media
+  if (quota.daily === 0) {
+    return { 
+      allowed: false, 
+      reason: 'AI görsel üretimi Premium planında! Yükselt veya manuel ekle.' 
+    };
+  }
+
+  // Check daily usage
+  const today = new Date().toISOString().split('T')[0];
+  const usage = dailyMediaUsage.get(userId);
+  
+  if (usage && usage.date === today && usage.count >= quota.daily) {
+    return { 
+      allowed: false, 
+      reason: `Günlük AI görsel kotası doldu (${quota.daily}). Premium ile sınırsız! 🎨` 
+    };
+  }
+
+  return { allowed: true };
+}
+
+// Update media usage tracking
+function updateMediaUsage(userId: string) {
+  const today = new Date().toISOString().split('T')[0];
+  const usage = dailyMediaUsage.get(userId);
+  
+  if (usage && usage.date === today) {
+    usage.count += 1;
+  } else {
+    dailyMediaUsage.set(userId, { date: today, count: 1 });
+  }
+}
+
+// Store media asset
+function storeMediaAsset(userId: string, url: string, prompt: string, platform: string): string {
+  const assetId = `media_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+  const hash = Buffer.from(`${prompt}:${platform}:${Date.now()}`).toString('base64').slice(0, 16);
+  
+  const asset = {
+    id: assetId,
+    userId,
+    url,
+    hash,
+    platform,
+    prompt,
+    mimeType: 'image/png',
+    createdAt: new Date().toISOString()
+  };
+  
+  mediaAssets.set(assetId, asset);
+  return assetId;
+}
+
 // Generate media for content item using direct API call
 async function generateMediaForContent(
   mediaPrompt: string,
-  platform: string
-): Promise<{ mediaUrl?: string; error?: string }> {
+  platform: string,
+  userId: string = 'mock_user',
+  userPlan: string = 'platinum'
+): Promise<{ mediaUrl?: string; assetId?: string; error?: string; quotaExceeded?: boolean }> {
   try {
+    // Check quota first
+    const quotaCheck = checkAIMediaQuota(userPlan, userId);
+    if (!quotaCheck.allowed) {
+      return { 
+        error: quotaCheck.reason, 
+        quotaExceeded: true 
+      };
+    }
+
     // Call the image generation API directly
     const response = await fetch('https://toolkit.rork.com/images/generate/', {
       method: 'POST',
@@ -102,7 +191,14 @@ async function generateMediaForContent(
     if (data.image?.base64Data) {
       // Convert base64 to data URL
       const mediaUrl = `data:${data.image.mimeType};base64,${data.image.base64Data}`;
-      return { mediaUrl };
+      
+      // Store in media assets
+      const assetId = storeMediaAsset(userId, mediaUrl, mediaPrompt, platform);
+      
+      // Update usage tracking
+      updateMediaUsage(userId);
+      
+      return { mediaUrl, assetId };
     } else {
       return { error: 'No image data received' };
     }
@@ -146,6 +242,7 @@ Görev:
     "title": "string",
     "body": "string",
     "mediaPrompt": "string|null",
+    "mediaUrl": "string|null",
     "scheduledAt": "ISO|null",
     "heldReason": "string|null"
   }
@@ -378,15 +475,30 @@ export const publishGenerateProcedure = publicProcedure
         // Generate media if mediaPrompt exists and item is not held
         let mediaUrl: string | undefined;
         let mediaError: string | undefined;
+        let mediaAssetId: string | undefined;
         
         if (item.mediaPrompt && item.status === 'draft') {
           console.log(`[Publish] Generating media for ${item.platform}: ${item.mediaPrompt}`);
-          const mediaResult = await generateMediaForContent(item.mediaPrompt, item.platform);
-          mediaUrl = mediaResult.mediaUrl;
-          mediaError = mediaResult.error;
+          const mockUserPlan = process.env.MOCK_USER_PLAN || "platinum";
+          const mediaResult = await generateMediaForContent(
+            item.mediaPrompt, 
+            item.platform, 
+            'mock_user', 
+            mockUserPlan
+          );
           
-          if (mediaError) {
-            console.warn(`[Publish] Media generation failed for ${item.platform}: ${mediaError}`);
+          if (mediaResult.quotaExceeded) {
+            // Mark item as held due to quota
+            item.status = 'held';
+            item.heldReason = mediaResult.error;
+          } else {
+            mediaUrl = mediaResult.mediaUrl;
+            mediaError = mediaResult.error;
+            mediaAssetId = mediaResult.assetId;
+            
+            if (mediaError) {
+              console.warn(`[Publish] Media generation failed for ${item.platform}: ${mediaError}`);
+            }
           }
         }
         
@@ -400,6 +512,7 @@ export const publishGenerateProcedure = publicProcedure
           mediaPrompt: item.mediaPrompt,
           mediaUrl,
           mediaError,
+          mediaAssetId,
           scheduledAt: item.scheduledAt,
           heldReason: item.heldReason,
           idempotencyKey,
@@ -450,7 +563,22 @@ export const publishRegenerateMediaProcedure = publicProcedure
     console.log(`[Publish] Regenerating media for ${input.itemId}:`, input.mediaPrompt);
     
     try {
-      const mediaResult = await generateMediaForContent(input.mediaPrompt, input.platform);
+      const mockUserPlan = process.env.MOCK_USER_PLAN || "platinum";
+      const mediaResult = await generateMediaForContent(
+        input.mediaPrompt, 
+        input.platform, 
+        'mock_user', 
+        mockUserPlan
+      );
+      
+      if (mediaResult.quotaExceeded) {
+        return {
+          success: false,
+          error: mediaResult.error,
+          quotaExceeded: true,
+          itemId: input.itemId
+        };
+      }
       
       if (mediaResult.error) {
         return {
@@ -463,6 +591,7 @@ export const publishRegenerateMediaProcedure = publicProcedure
       return {
         success: true,
         mediaUrl: mediaResult.mediaUrl,
+        assetId: mediaResult.assetId,
         itemId: input.itemId,
         message: 'Medya başarıyla yeniden oluşturuldu'
       };
@@ -528,4 +657,68 @@ export const publishBatchQueueProcedure = publicProcedure
         failed: input.itemIds.length - successCount
       }
     };
+  });
+
+// Get media usage stats
+export const publishGetMediaUsageProcedure = publicProcedure
+  .query(() => {
+    const mockUserPlan = process.env.MOCK_USER_PLAN || "platinum";
+    const quota = AI_MEDIA_QUOTAS[mockUserPlan as keyof typeof AI_MEDIA_QUOTAS];
+    const today = new Date().toISOString().split('T')[0];
+    const usage = dailyMediaUsage.get('mock_user');
+    const dailyUsed = (usage && usage.date === today) ? usage.count : 0;
+    
+    return {
+      plan: mockUserPlan,
+      quota: {
+        daily: quota?.daily || 0,
+        monthly: quota?.monthly || 0
+      },
+      usage: {
+        daily: dailyUsed,
+        remaining: quota?.daily === -1 ? -1 : Math.max(0, (quota?.daily || 0) - dailyUsed)
+      },
+      assets: {
+        total: mediaAssets.size,
+        today: Array.from(mediaAssets.values()).filter(
+          asset => asset.createdAt.startsWith(today)
+        ).length
+      }
+    };
+  });
+
+// Upload manual media (for user uploads)
+export const publishUploadMediaProcedure = publicProcedure
+  .input(z.object({
+    itemId: z.string(),
+    mediaUrl: z.string().url(),
+    mimeType: z.string().default('image/jpeg')
+  }))
+  .mutation(async ({ input }) => {
+    console.log(`[Publish] Manual media upload for ${input.itemId}`);
+    
+    try {
+      // Store the uploaded media asset
+      const assetId = storeMediaAsset(
+        'mock_user', 
+        input.mediaUrl, 
+        'user_uploaded', 
+        'manual'
+      );
+      
+      return {
+        success: true,
+        mediaUrl: input.mediaUrl,
+        assetId,
+        itemId: input.itemId,
+        message: 'Medya başarıyla yüklendi'
+      };
+    } catch (error) {
+      console.error('[Publish] Media upload error:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Medya yüklenemedi',
+        itemId: input.itemId
+      };
+    }
   });

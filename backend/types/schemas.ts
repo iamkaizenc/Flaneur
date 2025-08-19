@@ -75,6 +75,9 @@ export const ContentItemSchema = z.object({
   title: z.string(),
   body: z.string(),
   mediaUrls: z.array(z.string()).optional(),
+  mediaPrompt: z.string().optional(),
+  mediaUrl: z.string().optional(),
+  mediaError: z.string().optional(),
   hashtags: z.array(z.string()).optional(),
   scheduledAt: z.date().optional(),
   publishedAt: z.date().optional(),
@@ -257,11 +260,26 @@ export class RateLimitError extends Error {
 }
 
 export class QuotaError extends Error {
-  constructor(message: string, public platform?: Platform) {
+  constructor(message: string, public platform?: Platform, public quotaType?: string) {
     super(message);
     this.name = "QuotaError";
   }
 }
+
+// Media asset schema
+export const MediaAssetSchema = z.object({
+  id: z.string(),
+  userId: z.string(),
+  url: z.string(),
+  hash: z.string(),
+  platform: PlatformSchema.optional(),
+  prompt: z.string().optional(),
+  mimeType: z.string(),
+  size: z.number().optional(),
+  createdAt: z.date(),
+});
+
+export type MediaAsset = z.infer<typeof MediaAssetSchema>;
 
 export class ValidationError extends Error {
   constructor(message: string, public field?: string) {
