@@ -25,7 +25,6 @@ const tag = (deviceLocales[0]?.languageTag || 'en').replace('_','-');
 const guess = tag.startsWith('pt') ? 'pt-BR' : tag;
 
 i18n.use(initReactI18next).init({
-  compatibilityJSON: 'v4',
   resources,
   lng: resources[guess as keyof typeof resources] ? guess : 'en',
   fallbackLng: 'en',
