@@ -37,6 +37,11 @@ export const trpcClient = trpc.createClient({
           // Check if response is ok
           if (!response.ok) {
             console.error('[tRPC] HTTP error:', response.status, response.statusText);
+            
+            // Try to get response text for debugging
+            const responseText = await response.text();
+            console.error('[tRPC] Response body:', responseText.substring(0, 500));
+            
             throw new Error(`HTTP ${response.status}: ${response.statusText}`);
           }
           
@@ -44,6 +49,11 @@ export const trpcClient = trpc.createClient({
           const contentType = response.headers.get('content-type');
           if (!contentType?.includes('application/json')) {
             console.error('[tRPC] Non-JSON response:', contentType);
+            
+            // Try to get response text for debugging
+            const responseText = await response.text();
+            console.error('[tRPC] Response body:', responseText.substring(0, 500));
+            
             throw new Error(`Expected JSON response, got: ${contentType}`);
           }
           

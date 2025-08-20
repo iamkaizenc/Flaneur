@@ -600,66 +600,75 @@ export const oauthListAccountsProcedure = publicProcedure
   .query(async () => {
     console.log('[OAuth] Listing connected accounts');
     
-    const userId = "demo_user_id"; // In production, get from session
-    let userAccounts = socialAccounts.filter(acc => acc.userId === userId);
-    
-    // If no accounts exist, create some demo accounts
-    if (userAccounts.length === 0) {
-      const demoAccounts = [
-        {
-          id: "acc_x_demo",
-          userId,
-          platform: "x",
-          handle: "@flaneur_demo",
-          displayName: "Flaneur Demo",
-          accessToken: encrypt("demo_x_token"),
-          refreshToken: encrypt("demo_x_refresh"),
-          tokenExpiresAt: new Date(Date.now() + 3600000).toISOString(),
-          scopes: ["tweet.read", "tweet.write"],
-          status: "connected" as const,
-          lastRefresh: new Date().toISOString(),
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString()
-        },
-        {
-          id: "acc_linkedin_demo",
-          userId,
-          platform: "linkedin",
-          handle: "flaneur-demo",
-          displayName: "Flaneur Demo Company",
-          accessToken: encrypt("demo_linkedin_token"),
-          refreshToken: encrypt("demo_linkedin_refresh"),
-          tokenExpiresAt: new Date(Date.now() + 3600000).toISOString(),
-          scopes: ["w_member_social", "r_liteprofile"],
-          status: "connected" as const,
-          lastRefresh: new Date().toISOString(),
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString()
-        }
-      ];
+    try {
+      const userId = "demo_user_id"; // In production, get from session
+      let userAccounts = socialAccounts.filter(acc => acc.userId === userId);
       
-      socialAccounts.push(...demoAccounts);
-      userAccounts = demoAccounts;
+      // If no accounts exist, create some demo accounts
+      if (userAccounts.length === 0) {
+        const demoAccounts = [
+          {
+            id: "acc_x_demo",
+            userId,
+            platform: "x",
+            handle: "@flaneur_demo",
+            displayName: "Flaneur Demo",
+            accessToken: encrypt("demo_x_token"),
+            refreshToken: encrypt("demo_x_refresh"),
+            tokenExpiresAt: new Date(Date.now() + 3600000).toISOString(),
+            scopes: ["tweet.read", "tweet.write"],
+            status: "connected" as const,
+            lastRefresh: new Date().toISOString(),
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString()
+          },
+          {
+            id: "acc_linkedin_demo",
+            userId,
+            platform: "linkedin",
+            handle: "flaneur-demo",
+            displayName: "Flaneur Demo Company",
+            accessToken: encrypt("demo_linkedin_token"),
+            refreshToken: encrypt("demo_linkedin_refresh"),
+            tokenExpiresAt: new Date(Date.now() + 3600000).toISOString(),
+            scopes: ["w_member_social", "r_liteprofile"],
+            status: "connected" as const,
+            lastRefresh: new Date().toISOString(),
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString()
+          }
+        ];
+        
+        socialAccounts.push(...demoAccounts);
+        userAccounts = demoAccounts;
+      }
+      
+      const accounts = userAccounts.map(acc => ({
+        id: acc.id,
+        platform: acc.platform,
+        handle: acc.handle,
+        displayName: acc.displayName,
+        status: acc.status,
+        lastRefresh: acc.lastRefresh,
+        tokenExpiresAt: acc.tokenExpiresAt,
+        scopes: acc.scopes,
+        createdAt: acc.createdAt,
+        updatedAt: acc.updatedAt
+      }));
+      
+      // Always return a valid response structure
+      return {
+        accounts: accounts || [],
+        total: accounts.length
+      };
+    } catch (error) {
+      console.error('[OAuth] Error listing accounts:', error);
+      // Return empty but valid structure on error
+      return {
+        accounts: [],
+        total: 0
+      };
     }
-    
-    const accounts = userAccounts.map(acc => ({
-      id: acc.id,
-      platform: acc.platform,
-      handle: acc.handle,
-      displayName: acc.displayName,
-      status: acc.status,
-      lastRefresh: acc.lastRefresh,
-      tokenExpiresAt: acc.tokenExpiresAt,
-      scopes: acc.scopes,
-      createdAt: acc.createdAt,
-      updatedAt: acc.updatedAt
-    }));
-    
-    // Always return a valid response structure
-    return {
-      accounts: accounts || [],
-      total: accounts.length
-    };
   });
 
 export const oauthFixProcedure = publicProcedure

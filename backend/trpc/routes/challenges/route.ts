@@ -16,66 +16,98 @@ export const weeklyChallengesProcedure = publicProcedure
   .query(async ({ input }) => {
     console.log('Getting weekly challenge for user:', input.userId);
 
-    // Get current week start (Monday)
-    const now = new Date();
-    const dayOfWeek = now.getDay();
-    const daysToMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
-    const weekStart = new Date(now);
-    weekStart.setDate(now.getDate() - daysToMonday);
-    weekStart.setHours(0, 0, 0, 0);
+    try {
+      // Get current week start (Monday)
+      const now = new Date();
+      const dayOfWeek = now.getDay();
+      const daysToMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+      const weekStart = new Date(now);
+      weekStart.setDate(now.getDate() - daysToMonday);
+      weekStart.setHours(0, 0, 0, 0);
 
-    // Mock current challenge
-    const mockChallenge = {
-      id: `challenge_${input.userId}_${weekStart.getTime()}`,
-      userId: input.userId,
-      weekStart,
-      targetPosts: 3,
-      targetReels: 1,
-      targetLive: 0,
-      currentPosts: 2,
-      currentReels: 0,
-      currentLive: 0,
-      completed: false,
-      bonusAwarded: false,
-      createdAt: weekStart,
-      updatedAt: new Date(),
-    };
+      // Mock current challenge
+      const mockChallenge = {
+        id: `challenge_${input.userId}_${weekStart.getTime()}`,
+        userId: input.userId,
+        weekStart,
+        targetPosts: 3,
+        targetReels: 1,
+        targetLive: 0,
+        currentPosts: 2,
+        currentReels: 0,
+        currentLive: 0,
+        completed: false,
+        bonusAwarded: false,
+        createdAt: weekStart,
+        updatedAt: new Date(),
+      };
 
-    const totalProgress = mockChallenge.currentPosts + mockChallenge.currentReels + mockChallenge.currentLive;
-    const totalTarget = mockChallenge.targetPosts + mockChallenge.targetReels + mockChallenge.targetLive;
-    const progressPercentage = Math.round((totalProgress / totalTarget) * 100);
+      const totalProgress = mockChallenge.currentPosts + mockChallenge.currentReels + mockChallenge.currentLive;
+      const totalTarget = mockChallenge.targetPosts + mockChallenge.targetReels + mockChallenge.targetLive;
+      const progressPercentage = Math.round((totalProgress / totalTarget) * 100);
 
-    const isCompleted = mockChallenge.currentPosts >= mockChallenge.targetPosts &&
-                      mockChallenge.currentReels >= mockChallenge.targetReels &&
-                      mockChallenge.currentLive >= mockChallenge.targetLive;
+      const isCompleted = mockChallenge.currentPosts >= mockChallenge.targetPosts &&
+                        mockChallenge.currentReels >= mockChallenge.targetReels &&
+                        mockChallenge.currentLive >= mockChallenge.targetLive;
 
-    return {
-      challenge: {
-        ...mockChallenge,
-        completed: isCompleted,
-      },
-      progress: {
-        posts: {
-          current: mockChallenge.currentPosts,
-          target: mockChallenge.targetPosts,
-          percentage: Math.round((mockChallenge.currentPosts / mockChallenge.targetPosts) * 100),
+      return {
+        challenge: {
+          ...mockChallenge,
+          completed: isCompleted,
         },
-        reels: {
-          current: mockChallenge.currentReels,
-          target: mockChallenge.targetReels,
-          percentage: mockChallenge.targetReels > 0 ? Math.round((mockChallenge.currentReels / mockChallenge.targetReels) * 100) : 100,
+        progress: {
+          posts: {
+            current: mockChallenge.currentPosts,
+            target: mockChallenge.targetPosts,
+            percentage: Math.round((mockChallenge.currentPosts / mockChallenge.targetPosts) * 100),
+          },
+          reels: {
+            current: mockChallenge.currentReels,
+            target: mockChallenge.targetReels,
+            percentage: mockChallenge.targetReels > 0 ? Math.round((mockChallenge.currentReels / mockChallenge.targetReels) * 100) : 100,
+          },
+          live: {
+            current: mockChallenge.currentLive,
+            target: mockChallenge.targetLive,
+            percentage: mockChallenge.targetLive > 0 ? Math.round((mockChallenge.currentLive / mockChallenge.targetLive) * 100) : 100,
+          },
+          overall: progressPercentage,
         },
-        live: {
-          current: mockChallenge.currentLive,
-          target: mockChallenge.targetLive,
-          percentage: mockChallenge.targetLive > 0 ? Math.round((mockChallenge.currentLive / mockChallenge.targetLive) * 100) : 100,
+        isCompleted,
+        canClaimBonus: isCompleted && !mockChallenge.bonusAwarded,
+        daysLeft: 7 - Math.floor((now.getTime() - weekStart.getTime()) / (1000 * 60 * 60 * 24)),
+      };
+    } catch (error) {
+      console.error('[Challenges] Error fetching weekly challenge:', error);
+      // Return default structure on error
+      const now = new Date();
+      return {
+        challenge: {
+          id: `challenge_${input.userId}_default`,
+          userId: input.userId,
+          weekStart: now,
+          targetPosts: 3,
+          targetReels: 1,
+          targetLive: 0,
+          currentPosts: 0,
+          currentReels: 0,
+          currentLive: 0,
+          completed: false,
+          bonusAwarded: false,
+          createdAt: now,
+          updatedAt: now,
         },
-        overall: progressPercentage,
-      },
-      isCompleted,
-      canClaimBonus: isCompleted && !mockChallenge.bonusAwarded,
-      daysLeft: 7 - Math.floor((now.getTime() - weekStart.getTime()) / (1000 * 60 * 60 * 24)),
-    };
+        progress: {
+          posts: { current: 0, target: 3, percentage: 0 },
+          reels: { current: 0, target: 1, percentage: 0 },
+          live: { current: 0, target: 0, percentage: 100 },
+          overall: 0,
+        },
+        isCompleted: false,
+        canClaimBonus: false,
+        daysLeft: 7,
+      };
+    }
   });
 
 export const updateChallengeProcedure = publicProcedure

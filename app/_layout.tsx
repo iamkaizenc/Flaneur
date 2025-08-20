@@ -25,6 +25,8 @@ const queryClient = new QueryClient({
       refetchOnWindowFocus: false,
       // Ensure queries never return undefined
       placeholderData: (previousData: any) => previousData,
+      // Provide default fallback data for common query patterns
+      initialData: undefined,
     },
   },
 });

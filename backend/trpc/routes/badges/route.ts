@@ -15,73 +15,84 @@ export const badgesProcedure = publicProcedure
   .query(async ({ input }) => {
     console.log('Getting badges for user:', input.userId);
 
-    // Mock user data - in real app, fetch from database
-    const mockUserMetrics = [
-      {
-        id: "1",
+    try {
+      // Mock user data - in real app, fetch from database
+      const mockUserMetrics = [
+        {
+          id: "1",
+          userId: input.userId,
+          date: new Date(),
+          fameScore: 62,
+          engagementRate: 4.2,
+          postFrequency: 5,
+          followerGrowth: 12.5,
+          createdAt: new Date(),
+        }
+      ];
+
+      const mockStreak = {
+        id: `streak_${input.userId}`,
         userId: input.userId,
-        date: new Date(),
-        fameScore: 62,
-        engagementRate: 4.2,
-        postFrequency: 5,
-        followerGrowth: 12.5,
-        createdAt: new Date(),
-      }
-    ];
-
-    const mockStreak = {
-      id: `streak_${input.userId}`,
-      userId: input.userId,
-      currentStreak: 5,
-      longestStreak: 12,
-      lastPostDate: new Date(Date.now() - 24 * 60 * 60 * 1000), // Yesterday
-      updatedAt: new Date(),
-    };
-
-    // Mock totals
-    const totalPosts = 23;
-    const totalLikes = 156;
-    const totalComments = 8;
-    const maxReach = 850;
-
-    // Get badge definitions
-    const badgeDefinitions = BadgeService.getBadgeDefinitions();
-
-    // Calculate progress for each badge
-    const badgeProgress = badgeDefinitions.map((badge, index) => {
-      const progress = BadgeService.calculateBadgeProgress(
-        badge.type,
-        mockUserMetrics,
-        mockStreak,
-        totalPosts,
-        totalLikes,
-        totalComments,
-        maxReach
-      );
-
-      const completed = progress >= 100;
-      
-      return {
-        badgeId: `badge_${index}`,
-        name: badge.name,
-        description: badge.description,
-        icon: badge.icon,
-        progress: Math.round(progress),
-        threshold: badge.threshold,
-        completed,
-        awardedAt: completed ? new Date(Date.now() - Math.random() * 7 * 24 * 60 * 60 * 1000) : undefined,
+        currentStreak: 5,
+        longestStreak: 12,
+        lastPostDate: new Date(Date.now() - 24 * 60 * 60 * 1000), // Yesterday
+        updatedAt: new Date(),
       };
-    });
 
-    // Mock awarded badges (first 2 completed)
-    const awardedBadges = badgeProgress.filter(b => b.completed).slice(0, 2);
+      // Mock totals
+      const totalPosts = 23;
+      const totalLikes = 156;
+      const totalComments = 8;
+      const maxReach = 850;
 
-    return {
-      badges: badgeProgress,
-      awardedBadges,
-      totalBadges: badgeDefinitions.length,
-      completedCount: awardedBadges.length,
-    };
+      // Get badge definitions
+      const badgeDefinitions = BadgeService.getBadgeDefinitions();
+
+      // Calculate progress for each badge
+      const badgeProgress = badgeDefinitions.map((badge, index) => {
+        const progress = BadgeService.calculateBadgeProgress(
+          badge.type,
+          mockUserMetrics,
+          mockStreak,
+          totalPosts,
+          totalLikes,
+          totalComments,
+          maxReach
+        );
+
+        const completed = progress >= 100;
+        
+        return {
+          badgeId: `badge_${index}`,
+          name: badge.name,
+          description: badge.description,
+          icon: badge.icon,
+          progress: Math.round(progress),
+          threshold: badge.threshold,
+          completed,
+          awardedAt: completed ? new Date(Date.now() - Math.random() * 7 * 24 * 60 * 60 * 1000) : undefined,
+        };
+      });
+
+      // Mock awarded badges (first 2 completed)
+      const awardedBadges = badgeProgress.filter(b => b.completed).slice(0, 2);
+
+      return {
+        badges: badgeProgress || [],
+        awardedBadges: awardedBadges || [],
+        totalBadges: badgeDefinitions.length,
+        completedCount: awardedBadges.length,
+      };
+    } catch (error) {
+      console.error('[Badges] Error fetching badges:', error);
+      // Return empty but valid structure on error
+      return {
+        badges: [],
+        awardedBadges: [],
+        totalBadges: 0,
+        completedCount: 0,
+      };
+    }
   });
 
 export const streakProcedure = publicProcedure

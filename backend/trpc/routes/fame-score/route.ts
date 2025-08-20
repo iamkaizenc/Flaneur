@@ -26,23 +26,69 @@ export const fameScoreProcedure = publicProcedure
   .query(async ({ input }) => {
     console.log('Getting FameScore for user:', input.userId);
 
-    // Mock user metrics data with more realistic values
-    const mockMetrics = [
-      {
-        id: "1",
-        userId: input.userId,
-        date: new Date(),
-        fameScore: 0, // Will be calculated
-        engagementRate: 4.8,
-        postFrequency: 6,
-        followerGrowth: 8.3,
-        createdAt: new Date(),
-      },
-    ];
+    try {
+      // Mock user metrics data with more realistic values
+      const mockMetrics = [
+        {
+          id: "1",
+          userId: input.userId,
+          date: new Date(),
+          fameScore: 0, // Will be calculated
+          engagementRate: 4.8,
+          postFrequency: 6,
+          followerGrowth: 8.3,
+          createdAt: new Date(),
+        },
+      ];
 
-    const result = FameScoreService.calculateFromMetrics(mockMetrics);
-    
-    if (!result) {
+      const result = FameScoreService.calculateFromMetrics(mockMetrics);
+      
+      if (!result) {
+        return {
+          score: 0,
+          tier: "Yeni Başlangıç",
+          trend: [],
+          hasData: false,
+          breakdown: { reach: 0, engagement: 0, consistency: 0, penalty: 0 },
+          insights: [],
+          tooltip: "Hesap görünürlüğü & etkileşim gücünü ölçer",
+          progressText: "Henüz veri yok"
+        };
+      }
+
+      // Generate more realistic 30-day trend data
+      const trendData = Array.from({ length: 30 }, (_, i) => {
+        const date = new Date(Date.now() - i * 24 * 60 * 60 * 1000);
+        const baseScore = result.score;
+        const variation = Math.sin(i * 0.2) * 8 + Math.random() * 6 - 3;
+        const score = Math.max(0, Math.min(100, baseScore + variation));
+        
+        return {
+          date: date.toISOString().split('T')[0],
+          score: Math.round(score),
+        };
+      }).reverse();
+
+      // Calculate breakdown percentages
+      const breakdown = FameScoreService.getBreakdownPercentages(result.normalizedInputs);
+      
+      // Get insight badges
+      const previousScore = trendData[trendData.length - 8]?.score || result.score;
+      const insights = FameScoreService.getInsightBadges(result.score, previousScore, mockMetrics[0]);
+
+      return {
+        score: result.score,
+        tier: result.tier,
+        trend: trendData,
+        hasData: true,
+        breakdown,
+        insights,
+        tooltip: "Hesap görünürlüğü & etkileşim gücünü ölçer",
+        progressText: FameScoreService.getProgressNotificationText(result.score),
+      };
+    } catch (error) {
+      console.error('[FameScore] Error calculating fame score:', error);
+      // Return default structure on error
       return {
         score: 0,
         tier: "Yeni Başlangıç",
@@ -50,39 +96,10 @@ export const fameScoreProcedure = publicProcedure
         hasData: false,
         breakdown: { reach: 0, engagement: 0, consistency: 0, penalty: 0 },
         insights: [],
+        tooltip: "Hesap görünürlüğü & etkileşim gücünü ölçer",
+        progressText: "Veri yüklenirken hata oluştu"
       };
     }
-
-    // Generate more realistic 30-day trend data
-    const trendData = Array.from({ length: 30 }, (_, i) => {
-      const date = new Date(Date.now() - i * 24 * 60 * 60 * 1000);
-      const baseScore = result.score;
-      const variation = Math.sin(i * 0.2) * 8 + Math.random() * 6 - 3;
-      const score = Math.max(0, Math.min(100, baseScore + variation));
-      
-      return {
-        date: date.toISOString().split('T')[0],
-        score: Math.round(score),
-      };
-    }).reverse();
-
-    // Calculate breakdown percentages
-    const breakdown = FameScoreService.getBreakdownPercentages(result.normalizedInputs);
-    
-    // Get insight badges
-    const previousScore = trendData[trendData.length - 8]?.score || result.score;
-    const insights = FameScoreService.getInsightBadges(result.score, previousScore, mockMetrics[0]);
-
-    return {
-      score: result.score,
-      tier: result.tier,
-      trend: trendData,
-      hasData: true,
-      breakdown,
-      insights,
-      tooltip: "Hesap görünürlüğü & etkileşim gücünü ölçer",
-      progressText: FameScoreService.getProgressNotificationText(result.score),
-    };
   });
 
 export const fameScoreHistoryProcedure = publicProcedure

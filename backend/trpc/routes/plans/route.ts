@@ -62,20 +62,52 @@ export const plansGetCurrentProcedure = publicProcedure
   .query(async () => {
     console.log("[Plans] Fetching current plan and features");
     
-    const currentPlan = planDefinitions[mockUserPlan];
-    
-    return {
-      success: true,
-      plan: mockUserPlan,
-      ...currentPlan,
-      featuresEnabled: {
-        ...currentPlan.features,
-        description: currentPlan.description
-      },
-      billingCycle: "monthly",
-      nextBillingDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
-      cancelAtPeriodEnd: false
-    };
+    try {
+      const currentPlan = planDefinitions[mockUserPlan];
+      
+      return {
+        success: true,
+        plan: mockUserPlan,
+        ...currentPlan,
+        featuresEnabled: {
+          ...currentPlan.features,
+          description: currentPlan.description
+        },
+        billingCycle: "monthly",
+        nextBillingDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+        cancelAtPeriodEnd: false
+      };
+    } catch (error) {
+      console.error('[Plans] Error fetching current plan:', error);
+      // Return default plan on error
+      return {
+        success: true,
+        plan: "free" as const,
+        name: "Free",
+        description: "Basic features only",
+        price: 0,
+        features: {
+          analytics: false,
+          automation: false,
+          maxAccounts: 1,
+          dailyPosts: 5,
+          aiAgent: false,
+          prioritySupport: false
+        },
+        featuresEnabled: {
+          analytics: false,
+          automation: false,
+          maxAccounts: 1,
+          dailyPosts: 5,
+          aiAgent: false,
+          prioritySupport: false,
+          description: "Basic features only"
+        },
+        billingCycle: "monthly",
+        nextBillingDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+        cancelAtPeriodEnd: false
+      };
+    }
   });
 
 export const plansListProcedure = publicProcedure

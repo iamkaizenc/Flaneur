@@ -71,16 +71,6 @@ app.use(
     createContext,
     onError: ({ error, path }) => {
       console.error(`[tRPC] Error on ${path}:`, error);
-      
-      // Ensure tRPC errors are always JSON
-      return {
-        error: {
-          code: error.code || 'INTERNAL_ERROR',
-          message: error.message || 'An error occurred',
-          path,
-          timestamp: new Date().toISOString()
-        }
-      };
     },
     responseMeta: () => {
       return {
