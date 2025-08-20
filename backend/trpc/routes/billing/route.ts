@@ -291,7 +291,7 @@ export const webhookProcedure = publicProcedure
           console.log('[Billing] Subscription updated:', subscription.id);
           
           mockPlanState.status = subscription.status === 'active' ? 'active' : 'canceled';
-          // Type assertion for current_period_end
+          // Handle current_period_end properly
           const sub = subscription as any;
           if (sub.current_period_end) {
             mockPlanState.current_period_end = new Date(sub.current_period_end * 1000).toISOString();
