@@ -25,11 +25,11 @@ const BRAND_LOGO_SIZES = {
 };
 
 const LOGO_URLS = {
-  white: 'https://r2-pub.rork.com/generated-images/daf41c99-b713-4738-90b3-66506472b556.png',
-  icon: 'https://r2-pub.rork.com/generated-images/2e232366-2c92-4c53-bf55-5001d2ed8f4d.png',
+  white: 'https://r2-pub.rork.com/generated-images/c0335cc8-a49c-4ba9-bc24-257b3280e5d9.png',
+  icon: 'https://r2-pub.rork.com/generated-images/c0335cc8-a49c-4ba9-bc24-257b3280e5d9.png',
 };
 
-const BRAND_LOGO_URL = 'https://r2-pub.rork.com/generated-images/543bcbb5-0d62-44df-8418-1a976e2e3552.png';
+const BRAND_LOGO_URL = 'https://r2-pub.rork.com/generated-images/c0335cc8-a49c-4ba9-bc24-257b3280e5d9.png';
 
 export function Logo({ size = 'medium', style, variant = 'white' }: LogoProps) {
   const logoSize = LOGO_SIZES[size];
@@ -69,13 +69,13 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   logo: {
-    // Flâneur logo - white on transparent for dark backgrounds
+    // Minimalist flâneur logo - walking man with elegant typography
   },
   brandContainer: {
     alignItems: 'center',
     justifyContent: 'center',
   },
   brandLogo: {
-    // Flâneur glow logo - preserves glow effect, no recoloring
+    // Minimalist flâneur logo - clean vector design with gradient background
   },
 });
