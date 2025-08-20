@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { publicProcedure } from "../../create-context";
+import { publicProcedure, protectedProcedure } from "../../create-context";
 import banwords from "../../../config/banwords.json";
 
 // AI Content Generation Types
@@ -692,6 +692,536 @@ export const publishGetMediaUsageProcedure = publicProcedure
           asset => asset.createdAt.startsWith(today)
         ).length
       }
+    };
+  });
+
+// Publishing Pipeline Procedures
+
+// Publishing status types
+type PublishStatus = 'draft' | 'queued' | 'published' | 'held' | 'error';
+type Platform = 'x' | 'instagram' | 'facebook' | 'linkedin' | 'tiktok' | 'telegram';
+
+// Mock content database
+const mockPublishContent: {
+  id: string;
+  title: string;
+  content: string;
+  platforms: Platform[];
+  status: PublishStatus;
+  scheduledAt?: string;
+  publishedAt?: string;
+  heldReason?: string;
+  errorMessage?: string;
+  links?: Partial<Record<Platform, string>>;
+  createdAt: string;
+  updatedAt: string;
+}[] = [
+  {
+    id: 'content_1',
+    title: 'Welcome Post',
+    content: 'Welcome to our platform! 🚀 #launch #welcome',
+    platforms: ['x', 'instagram'],
+    status: 'published',
+    publishedAt: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
+    links: {
+      x: 'https://x.com/demo/status/123456789',
+      instagram: 'https://instagram.com/p/ABC123DEF',
+      facebook: '',
+      linkedin: '',
+      tiktok: '',
+      telegram: ''
+    },
+    createdAt: new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString(),
+    updatedAt: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString()
+  },
+  {
+    id: 'content_2',
+    title: 'Product Update',
+    content: 'New features are live! Check them out in the app. #update #features',
+    platforms: ['x', 'linkedin'],
+    status: 'held',
+    heldReason: 'Contains banned word: "check"',
+    createdAt: new Date(Date.now() - 1 * 60 * 60 * 1000).toISOString(),
+    updatedAt: new Date(Date.now() - 1 * 60 * 60 * 1000).toISOString()
+  },
+  {
+    id: 'content_3',
+    title: 'Daily Tip',
+    content: 'Pro tip: Use hashtags strategically for better reach! #tips #socialmedia',
+    platforms: ['x', 'instagram', 'linkedin'],
+    status: 'queued',
+    scheduledAt: new Date(Date.now() + 30 * 60 * 1000).toISOString(),
+    createdAt: new Date(Date.now() - 30 * 60 * 1000).toISOString(),
+    updatedAt: new Date(Date.now() - 30 * 60 * 1000).toISOString()
+  }
+];
+
+// Mock job queue
+const mockPublishJobs: {
+  id: string;
+  contentId: string;
+  platforms: Platform[];
+  runAt: string;
+  status: 'pending' | 'running' | 'completed' | 'failed';
+  attempts: number;
+  maxAttempts: number;
+  error?: string;
+  result?: any;
+  createdAt: string;
+  updatedAt: string;
+}[] = [];
+
+// Guardrails configuration
+const PUBLISH_GUARDRAILS = {
+  postingWindow: { start: 8, end: 22 }, // 8 AM to 10 PM
+  dailyLimits: { x: 10, instagram: 5, facebook: 3, linkedin: 2, tiktok: 3, telegram: 20 },
+  bannedWords: ['spam', 'fake', 'scam', 'check', 'click here', 'free money'],
+  maxHashtags: { x: 2, instagram: 30, facebook: 5, linkedin: 3, tiktok: 5, telegram: 5 }
+};
+
+// Queue content for publishing
+export const queueProcedure = protectedProcedure
+  .input(z.object({
+    contentId: z.string(),
+    platforms: z.array(z.enum(['x', 'instagram', 'facebook', 'linkedin', 'tiktok', 'telegram'])),
+    runAt: z.string().optional() // ISO string, defaults to now
+  }))
+  .mutation(async ({ input }) => {
+    console.log('[Publish] Queuing content:', input);
+    
+    const isDryRun = process.env.DRY_RUN === 'true' || process.env.DRY_RUN === '1';
+    const runAt = input.runAt ? new Date(input.runAt) : new Date();
+    
+    // Find content
+    const content = mockPublishContent.find(c => c.id === input.contentId);
+    if (!content) {
+      throw new Error(`Content not found: ${input.contentId}`);
+    }
+    
+    // Check posting window
+    const hour = runAt.getHours();
+    if (hour < PUBLISH_GUARDRAILS.postingWindow.start || hour > PUBLISH_GUARDRAILS.postingWindow.end) {
+      content.status = 'held';
+      content.heldReason = `Outside posting window (${PUBLISH_GUARDRAILS.postingWindow.start}:00-${PUBLISH_GUARDRAILS.postingWindow.end}:00)`;
+      content.updatedAt = new Date().toISOString();
+      
+      return {
+        success: false,
+        message: 'Content held due to posting window restriction',
+        contentId: input.contentId,
+        status: 'held',
+        heldReason: content.heldReason
+      };
+    }
+    
+    // Check banned words
+    const bannedWord = PUBLISH_GUARDRAILS.bannedWords.find(word => 
+      content.content.toLowerCase().includes(word.toLowerCase())
+    );
+    if (bannedWord) {
+      content.status = 'held';
+      content.heldReason = `Contains banned word: "${bannedWord}"`;
+      content.updatedAt = new Date().toISOString();
+      
+      return {
+        success: false,
+        message: 'Content held due to banned word',
+        contentId: input.contentId,
+        status: 'held',
+        heldReason: content.heldReason
+      };
+    }
+    
+    // Create job
+    const jobId = `job_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const job = {
+      id: jobId,
+      contentId: input.contentId,
+      platforms: input.platforms,
+      runAt: runAt.toISOString(),
+      status: 'pending' as const,
+      attempts: 0,
+      maxAttempts: 3,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
+    
+    mockPublishJobs.push(job);
+    
+    // Update content status
+    content.status = 'queued';
+    content.scheduledAt = runAt.toISOString();
+    content.platforms = input.platforms;
+    content.updatedAt = new Date().toISOString();
+    
+    console.log(`[Publish] ${isDryRun ? 'DRY_RUN' : 'LIVE'} - Job queued:`, jobId);
+    
+    return {
+      success: true,
+      message: `Content queued for publishing ${isDryRun ? '(DRY_RUN mode)' : ''}`,
+      jobId,
+      contentId: input.contentId,
+      runAt: runAt.toISOString(),
+      platforms: input.platforms,
+      idempotencyKey: `${input.contentId}_${runAt.getTime()}`
+    };
+  });
+
+// Execute publishing job
+export const executeProcedure = protectedProcedure
+  .input(z.object({
+    jobId: z.string(),
+    idempotencyKey: z.string().optional()
+  }))
+  .mutation(async ({ input }) => {
+    console.log('[Publish] Executing job:', input.jobId);
+    
+    const isDryRun = process.env.DRY_RUN === 'true' || process.env.DRY_RUN === '1';
+    
+    // Find job
+    const job = mockPublishJobs.find(j => j.id === input.jobId);
+    if (!job) {
+      throw new Error(`Job not found: ${input.jobId}`);
+    }
+    
+    // Check idempotency
+    if (job.status === 'completed') {
+      console.log('[Publish] Job already completed (idempotent)');
+      return {
+        success: true,
+        message: 'Job already completed',
+        jobId: input.jobId,
+        status: 'completed',
+        idempotent: true
+      };
+    }
+    
+    // Find content
+    const content = mockPublishContent.find(c => c.id === job.contentId);
+    if (!content) {
+      job.status = 'failed';
+      job.error = 'Content not found';
+      job.updatedAt = new Date().toISOString();
+      throw new Error(`Content not found: ${job.contentId}`);
+    }
+    
+    // Update job status
+    job.status = 'running';
+    job.attempts += 1;
+    job.updatedAt = new Date().toISOString();
+    
+    try {
+      // Simulate publishing to platforms
+      const results: Partial<Record<Platform, { success: boolean; link?: string; error?: string }>> = {};
+      
+      for (const platform of job.platforms) {
+        if (isDryRun) {
+          // Simulate success in DRY_RUN mode
+          results[platform] = {
+            success: true,
+            link: `https://${platform}.com/demo/post/${Date.now()}`
+          };
+        } else {
+          // In LIVE mode, this would make actual API calls
+          // For now, simulate with random success/failure
+          const success = Math.random() > 0.2; // 80% success rate
+          if (success) {
+            results[platform] = {
+              success: true,
+              link: `https://${platform}.com/demo/post/${Date.now()}`
+            };
+          } else {
+            results[platform] = {
+              success: false,
+              error: 'API rate limit exceeded'
+            };
+          }
+        }
+      }
+      
+      // Check if all platforms succeeded
+      const allSucceeded = Object.values(results).every(r => r.success);
+      
+      if (allSucceeded) {
+        // Success - update job and content
+        job.status = 'completed';
+        job.result = results;
+        
+        content.status = 'published';
+        content.publishedAt = new Date().toISOString();
+        content.links = Object.fromEntries(
+          Object.entries(results)
+            .filter(([_, result]) => result && result.success && result.link)
+            .map(([platform, result]) => [platform, result!.link!])
+        ) as Partial<Record<Platform, string>>;
+        
+        console.log(`[Publish] ${isDryRun ? 'DRY_RUN' : 'LIVE'} - Job completed successfully:`, input.jobId);
+        
+        return {
+          success: true,
+          message: `Content published successfully ${isDryRun ? '(DRY_RUN mode)' : ''}`,
+          jobId: input.jobId,
+          contentId: job.contentId,
+          platforms: job.platforms,
+          links: content.links,
+          publishedAt: content.publishedAt
+        };
+      } else {
+        // Partial failure - retry if attempts remaining
+        const failedPlatforms = Object.entries(results)
+          .filter(([_, result]) => !result.success)
+          .map(([platform, result]) => `${platform}: ${result.error}`);
+        
+        if (job.attempts < job.maxAttempts) {
+          job.status = 'pending'; // Will be retried
+          content.status = 'queued';
+          
+          console.log(`[Publish] Job failed, will retry (${job.attempts}/${job.maxAttempts}):`, failedPlatforms);
+          
+          return {
+            success: false,
+            message: `Publishing failed, will retry (${job.attempts}/${job.maxAttempts})`,
+            jobId: input.jobId,
+            error: failedPlatforms.join(', '),
+            willRetry: true
+          };
+        } else {
+          // Max attempts reached
+          job.status = 'failed';
+          job.error = failedPlatforms.join(', ');
+          
+          content.status = 'error';
+          content.errorMessage = `Publishing failed: ${job.error}`;
+          
+          console.log(`[Publish] Job failed permanently:`, failedPlatforms);
+          
+          return {
+            success: false,
+            message: 'Publishing failed permanently',
+            jobId: input.jobId,
+            error: job.error,
+            willRetry: false
+          };
+        }
+      }
+    } catch (error) {
+      // Unexpected error
+      job.status = 'failed';
+      job.error = error instanceof Error ? error.message : 'Unknown error';
+      
+      content.status = 'error';
+      content.errorMessage = job.error;
+      
+      console.error('[Publish] Job execution error:', error);
+      throw error;
+    } finally {
+      job.updatedAt = new Date().toISOString();
+      content.updatedAt = new Date().toISOString();
+    }
+  });
+
+// Verify published content
+export const verifyProcedure = protectedProcedure
+  .input(z.object({
+    postId: z.string(), // This could be contentId or actual platform post ID
+    platform: z.enum(['x', 'instagram', 'facebook', 'linkedin', 'tiktok', 'telegram']).optional()
+  }))
+  .mutation(async ({ input }) => {
+    console.log('[Publish] Verifying post:', input);
+    
+    const isDryRun = process.env.DRY_RUN === 'true' || process.env.DRY_RUN === '1';
+    
+    // Find content by ID or search in links
+    let content = mockPublishContent.find(c => c.id === input.postId);
+    if (!content) {
+      // Try to find by platform link
+      content = mockPublishContent.find(c => 
+        c.links && Object.values(c.links).some(link => link && link.includes(input.postId))
+      );
+    }
+    
+    if (!content) {
+      throw new Error(`Post not found: ${input.postId}`);
+    }
+    
+    if (content.status !== 'published') {
+      return {
+        success: false,
+        message: 'Post is not in published status',
+        status: content.status,
+        postId: input.postId
+      };
+    }
+    
+    // Simulate verification
+    const verificationResults: Record<string, { exists: boolean; url?: string; metrics?: any }> = {};
+    
+    if (content.links) {
+      for (const [platform, link] of Object.entries(content.links)) {
+        if (!input.platform || platform === input.platform) {
+          if (isDryRun) {
+            // Simulate successful verification
+            verificationResults[platform] = {
+              exists: true,
+              url: link,
+              metrics: {
+                views: Math.floor(Math.random() * 1000),
+                likes: Math.floor(Math.random() * 100),
+                shares: Math.floor(Math.random() * 20)
+              }
+            };
+          } else {
+            // In LIVE mode, this would make actual API calls to verify
+            // For now, simulate with high success rate
+            const exists = Math.random() > 0.1; // 90% success rate
+            verificationResults[platform] = {
+              exists,
+              url: exists ? link : undefined,
+              metrics: exists ? {
+                views: Math.floor(Math.random() * 1000),
+                likes: Math.floor(Math.random() * 100),
+                shares: Math.floor(Math.random() * 20)
+              } : undefined
+            };
+          }
+        }
+      }
+    }
+    
+    console.log(`[Publish] ${isDryRun ? 'DRY_RUN' : 'LIVE'} - Verification completed:`, input.postId);
+    
+    return {
+      success: true,
+      message: `Post verification completed ${isDryRun ? '(DRY_RUN mode)' : ''}`,
+      postId: input.postId,
+      contentId: content.id,
+      platforms: Object.keys(verificationResults),
+      results: verificationResults,
+      verifiedAt: new Date().toISOString()
+    };
+  });
+
+// Get content logs for UI
+export const logsProcedure = protectedProcedure
+  .input(z.object({
+    cursor: z.string().optional(),
+    limit: z.number().min(1).max(100).default(20),
+    status: z.enum(['draft', 'queued', 'published', 'held', 'error']).optional(),
+    platform: z.enum(['x', 'instagram', 'facebook', 'linkedin', 'tiktok', 'telegram']).optional()
+  }))
+  .query(async ({ input }) => {
+    console.log('[Publish] Getting content logs:', input);
+    
+    let filteredContent = [...mockPublishContent];
+    
+    // Apply filters
+    if (input.status) {
+      filteredContent = filteredContent.filter(c => c.status === input.status);
+    }
+    
+    if (input.platform) {
+      filteredContent = filteredContent.filter(c => c.platforms.includes(input.platform!));
+    }
+    
+    // Sort by updatedAt desc
+    filteredContent.sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
+    
+    // Apply cursor pagination
+    let startIndex = 0;
+    if (input.cursor) {
+      const cursorIndex = filteredContent.findIndex(c => c.id === input.cursor);
+      if (cursorIndex >= 0) {
+        startIndex = cursorIndex + 1;
+      }
+    }
+    
+    const paginatedContent = filteredContent.slice(startIndex, startIndex + input.limit);
+    const hasMore = startIndex + input.limit < filteredContent.length;
+    const nextCursor = hasMore ? paginatedContent[paginatedContent.length - 1]?.id : null;
+    
+    return {
+      success: true,
+      content: paginatedContent.map(c => ({
+        id: c.id,
+        title: c.title,
+        content: c.content.substring(0, 100) + (c.content.length > 100 ? '...' : ''),
+        platforms: c.platforms,
+        status: c.status,
+        scheduledAt: c.scheduledAt,
+        publishedAt: c.publishedAt,
+        heldReason: c.heldReason,
+        errorMessage: c.errorMessage,
+        links: c.links,
+        createdAt: c.createdAt,
+        updatedAt: c.updatedAt
+      })),
+      pagination: {
+        hasMore,
+        nextCursor,
+        total: filteredContent.length
+      }
+    };
+  });
+
+// Get publishing statistics
+export const statsProcedure = protectedProcedure
+  .input(z.object({
+    range: z.enum(['24h', '7d', '30d']).default('7d')
+  }))
+  .query(async ({ input }) => {
+    console.log('[Publish] Getting publishing stats:', input.range);
+    
+    const now = new Date();
+    const rangeMs = {
+      '24h': 24 * 60 * 60 * 1000,
+      '7d': 7 * 24 * 60 * 60 * 1000,
+      '30d': 30 * 24 * 60 * 60 * 1000
+    }[input.range];
+    
+    const cutoff = new Date(now.getTime() - rangeMs);
+    
+    // Filter content within range
+    const recentContent = mockPublishContent.filter(c => 
+      new Date(c.updatedAt) >= cutoff
+    );
+    
+    // Calculate stats
+    const stats = {
+      total: recentContent.length,
+      published: recentContent.filter(c => c.status === 'published').length,
+      queued: recentContent.filter(c => c.status === 'queued').length,
+      held: recentContent.filter(c => c.status === 'held').length,
+      error: recentContent.filter(c => c.status === 'error').length,
+      draft: recentContent.filter(c => c.status === 'draft').length
+    };
+    
+    const successRate = stats.total > 0 ? (stats.published / stats.total) * 100 : 0;
+    
+    // Platform breakdown
+    const platformStats: Record<Platform, number> = {
+      x: 0,
+      instagram: 0,
+      facebook: 0,
+      linkedin: 0,
+      tiktok: 0,
+      telegram: 0
+    };
+    
+    recentContent.forEach(c => {
+      if (c.status === 'published') {
+        c.platforms.forEach(platform => {
+          platformStats[platform]++;
+        });
+      }
+    });
+    
+    return {
+      success: true,
+      range: input.range,
+      stats,
+      successRate: Math.round(successRate * 10) / 10,
+      platformStats,
+      generatedAt: new Date().toISOString()
     };
   });
 
