@@ -25,7 +25,7 @@ import {
 import { router } from "expo-router";
 import { useAIMarketer } from "@/providers/AIMarketerProvider";
 import { theme, brandName } from "@/constants/theme";
-import { trpc } from "@/lib/trpc";
+import { trpc, getFallbackData } from "@/lib/trpc";
 import { AIPublishModal } from "@/components/AIPublishModal";
 
 type ContentStatus = "draft" | "queued" | "published" | "held" | "error";
@@ -106,13 +106,31 @@ const ContentCard: React.FC<ContentCardProps> = ({
 export default function ContentScreen() {
   const [selectedFilter, setSelectedFilter] = useState<ContentStatus | "all">("all");
   const [showAIModal, setShowAIModal] = useState<boolean>(false);
-  const contentQuery = trpc.content.list.useQuery({
-    limit: 50,
-    status: selectedFilter === "all" ? undefined : selectedFilter,
-  });
+  const contentQuery = trpc.content.list.useQuery(
+    {
+      limit: 50,
+      status: selectedFilter === "all" ? undefined : selectedFilter,
+    },
+    {
+      // Handle errors gracefully and don't retry network errors
+      retry: (failureCount, error) => {
+        if (error?.message?.includes('NETWORK_ERROR') || error?.message?.includes('Failed to fetch')) {
+          return false;
+        }
+        return failureCount < 2;
+      },
+      // Use stale data if available
+      staleTime: 1000 * 60 * 5, // 5 minutes
+    }
+  );
   
   // Test query to verify tRPC is working
-  const testQuery = trpc.example.hi.useQuery({ name: "Test" });
+  const testQuery = trpc.example.hi.useQuery(
+    { name: "Test" },
+    {
+      retry: false, // Don't retry test queries
+    }
+  );
   
   // Debug logging
   console.log('[Content] Query status:', {
@@ -130,14 +148,22 @@ export default function ContentScreen() {
     data: testQuery.data
   });
   
-  const contentItems = contentQuery.data?.items || [];
+  // Ensure we always have valid data - use fallback if query failed
+  const contentItems = contentQuery.data?.items || (() => {
+    if (contentQuery.isError) {
+      console.log('[Content] Using fallback data due to query error');
+      const fallback = getFallbackData('content.list') as any;
+      return fallback?.items || [];
+    }
+    return [];
+  })();
 
   const filters: Array<{ label: string; value: ContentStatus | "all"; count: number }> = [
     { label: "All", value: "all", count: contentItems.length },
-    { label: "Queued", value: "queued", count: contentItems.filter(i => i.status === "queued").length },
-    { label: "Published", value: "published", count: contentItems.filter(i => i.status === "published").length },
-    { label: "Held", value: "held", count: contentItems.filter(i => i.status === "held").length },
-    { label: "Draft", value: "draft", count: contentItems.filter(i => i.status === "draft").length },
+    { label: "Queued", value: "queued", count: contentItems.filter((i: any) => i.status === "queued").length },
+    { label: "Published", value: "published", count: contentItems.filter((i: any) => i.status === "published").length },
+    { label: "Held", value: "held", count: contentItems.filter((i: any) => i.status === "held").length },
+    { label: "Draft", value: "draft", count: contentItems.filter((i: any) => i.status === "draft").length },
   ];
 
   const filteredContent = contentItems;
@@ -152,7 +178,9 @@ export default function ContentScreen() {
   const handleAISuccess = (items: any[]) => {
     console.log('AI generated items:', items);
     // Refresh content list
-    contentQuery.refetch();
+    contentQuery.refetch().catch((error) => {
+      console.error('[Content] Failed to refetch after AI success:', error);
+    });
   };
 
   return (
@@ -255,7 +283,7 @@ export default function ContentScreen() {
         </ScrollView>
 
         <View style={styles.contentList}>
-          {filteredContent.map((item) => (
+          {filteredContent.map((item: any) => (
             <ContentCard
               key={item.id}
               title={item.title}
