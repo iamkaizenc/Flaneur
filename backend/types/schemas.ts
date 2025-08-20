@@ -281,6 +281,17 @@ export const MediaAssetSchema = z.object({
 
 export type MediaAsset = z.infer<typeof MediaAssetSchema>;
 
+// Idempotency key schema
+export const IdempotencyKeySchema = z.object({
+  key: z.string(),
+  userId: z.string(),
+  result: z.record(z.string(), z.any()).optional(),
+  expiresAt: z.date(),
+  createdAt: z.date(),
+});
+
+export type IdempotencyKey = z.infer<typeof IdempotencyKeySchema>;
+
 export class ValidationError extends Error {
   constructor(message: string, public field?: string) {
     super(message);
@@ -294,3 +305,100 @@ export class NetworkError extends Error {
     this.name = "NetworkError";
   }
 }
+
+// Job schema for scheduler/worker system
+export const JobSchema = z.object({
+  id: z.string(),
+  contentId: z.string(),
+  userId: z.string(),
+  runAt: z.date(),
+  attempts: z.number().default(0),
+  maxAttempts: z.number().default(5),
+  status: z.enum(["pending", "running", "completed", "failed", "cancelled"]).default("pending"),
+  lastError: z.string().optional(),
+  idempotencyKey: z.string(),
+  priority: z.number().default(0),
+  createdAt: z.date(),
+  updatedAt: z.date(),
+  completedAt: z.date().optional(),
+  nextRetryAt: z.date().optional(),
+});
+
+export type Job = z.infer<typeof JobSchema>;
+
+// Publish log schema (enhanced with job tracking)
+export const PublishLogSchema = z.object({
+  id: z.string(),
+  contentId: z.string(),
+  jobId: z.string().optional(),
+  platform: PlatformSchema,
+  action: z.enum(["queue", "publish", "hold", "retry"]),
+  status: ContentStatusSchema,
+  reason: z.string().optional(),
+  attempt: z.number().default(1),
+  latency: z.number().optional(), // in milliseconds
+  createdAt: z.date(),
+});
+
+export type PublishLog = z.infer<typeof PublishLogSchema>;
+
+// Notification event schema
+export const NotificationEventSchema = z.object({
+  type: z.enum([
+    "content.queued",
+    "content.published", 
+    "content.held",
+    "content.error",
+    "insight.created",
+    "fameScore.weeklyDelta"
+  ]),
+  userId: z.string(),
+  data: z.record(z.string(), z.any()),
+  timestamp: z.date(),
+});
+
+export type NotificationEvent = z.infer<typeof NotificationEventSchema>;
+
+// Webhook schema
+export const WebhookSchema = z.object({
+  id: z.string(),
+  userId: z.string(),
+  url: z.string().url(),
+  secret: z.string(),
+  events: z.array(z.string()),
+  active: z.boolean().default(true),
+  createdAt: z.date(),
+  updatedAt: z.date(),
+});
+
+export type Webhook = z.infer<typeof WebhookSchema>;
+
+// Email template schema
+export const EmailTemplateSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  subject: z.string(),
+  body: z.string(),
+  locale: z.string().default("en"),
+  createdAt: z.date(),
+  updatedAt: z.date(),
+});
+
+export type EmailTemplate = z.infer<typeof EmailTemplateSchema>;
+
+// Notification history schema
+export const NotificationHistorySchema = z.object({
+  id: z.string(),
+  userId: z.string(),
+  type: z.string(),
+  channel: z.enum(["email", "push", "telegram", "webhook"]),
+  recipient: z.string(),
+  subject: z.string().optional(),
+  body: z.string(),
+  status: z.enum(["pending", "sent", "failed", "delivered"]),
+  error: z.string().optional(),
+  createdAt: z.date(),
+  sentAt: z.date().optional(),
+});
+
+export type NotificationHistory = z.infer<typeof NotificationHistorySchema>;

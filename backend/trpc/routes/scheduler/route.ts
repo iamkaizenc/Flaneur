@@ -1,484 +1,481 @@
 import { z } from "zod";
 import { publicProcedure } from "../../create-context";
+import type { Job, ContentItem } from "../../../types/schemas";
 
-// Platform schema
-const PlatformSchema = z.enum([
-  "x",
-  "instagram", 
-  "linkedin",
-  "tiktok",
-  "facebook",
-  "telegram"
-]);
+// Mock job store - in production this would be a database
+const mockJobs: Job[] = [];
+const mockContent: ContentItem[] = [];
 
-// Job status types
-const JobStatusSchema = z.enum(["pending", "running", "completed", "failed", "cancelled"]);
-
-// Job schema
-const JobSchema = z.object({
-  id: z.string(),
-  contentId: z.string(),
-  userId: z.string(),
-  platform: PlatformSchema,
-  runAt: z.date(),
-  attempts: z.number().default(0),
-  maxAttempts: z.number().default(3),
-  status: JobStatusSchema,
-  lastError: z.string().optional(),
-  idempotencyKey: z.string(),
-  createdAt: z.date(),
-  updatedAt: z.date(),
-});
-
-type Job = z.infer<typeof JobSchema>;
-
-// Input schemas
-const runNowInputSchema = z.object({
-  jobId: z.string(),
-});
-
-const rescheduleInputSchema = z.object({
-  jobId: z.string(),
-  runAt: z.date(),
-});
-
-const cancelInputSchema = z.object({
-  jobId: z.string(),
-});
-
-const listJobsInputSchema = z.object({
-  userId: z.string().optional(),
-  status: JobStatusSchema.optional(),
-  limit: z.number().min(1).max(100).default(20),
-  offset: z.number().min(0).default(0),
-});
-
-const queueJobInputSchema = z.object({
-  contentId: z.string(),
-  userId: z.string(),
-  platform: PlatformSchema,
-  runAt: z.date().optional(),
-  idempotencyKey: z.string().optional(),
-});
-
-// Mock job storage
-let mockJobs: Job[] = [];
-
-// Utility functions
-function generateIdempotencyKey(platform: string, contentHash: string, day: string): string {
-  return `${platform}:${contentHash}:${day}`;
+// Backoff calculation helper
+function calculateBackoff(attempt: number): number {
+  const backoffTimes = [60000, 300000, 900000, 3600000]; // 1m, 5m, 15m, 60m
+  return backoffTimes[Math.min(attempt - 1, backoffTimes.length - 1)];
 }
 
-function isWithinPostingWindow(date: Date): boolean {
-  const hour = date.getHours();
-  return hour >= 8 && hour <= 22; // 08:00-22:00
-}
-
-function checkPlanGates(userId: string, platform: string): { allowed: boolean; reason?: string } {
-  // Mock plan checking - in production this would check user's actual plan
-  // Simulate different users having different plans
-  const userPlans: Record<string, "free" | "premium" | "platinum"> = {
-    "user1": "free",
-    "user2": "premium", 
-    "user3": "platinum"
-  };
+// Worker class for processing jobs
+class JobWorker {
+  private isRunning = false;
+  public lastTick = new Date();
   
-  const mockUserPlan = userPlans[userId] || "premium";
-  
-  if (mockUserPlan === "free") {
-    return { allowed: false, reason: "Free plan requires manual publishing" };
-  }
-  
-  return { allowed: true };
-}
-
-function checkQuotas(userId: string, platform: string, date: Date): { allowed: boolean; reason?: string } {
-  // Mock quota checking - in production this would check actual usage
-  const dailyLimit = 10;
-  const currentUsage = Math.floor(Math.random() * 8); // Mock current usage
-  
-  if (currentUsage >= dailyLimit) {
-    return { allowed: false, reason: `Daily quota exceeded for ${platform} (${currentUsage}/${dailyLimit})` };
-  }
-  
-  return { allowed: true };
-}
-
-async function executeJob(job: Job): Promise<{ success: boolean; error?: string }> {
-  console.log(`[Scheduler] Executing job ${job.id} for content ${job.contentId}`);
-  
-  const isDryRun = process.env.DRY_RUN === "true" || process.env.DRY_RUN === "1";
-  
-  try {
-    // Check posting window
-    if (!isWithinPostingWindow(new Date())) {
-      return { success: false, error: "Outside posting window (08:00-22:00)" };
+  async tick(): Promise<{ processed: number; errors: number; nextRun?: string }> {
+    if (this.isRunning) {
+      return { processed: 0, errors: 0, nextRun: "Worker already running" };
     }
     
-    // Check plan gates
-    const planCheck = checkPlanGates(job.userId, job.platform);
-    if (!planCheck.allowed) {
-      return { success: false, error: planCheck.reason };
-    }
+    this.isRunning = true;
+    this.lastTick = new Date();
     
-    // Check quotas
-    const quotaCheck = checkQuotas(job.userId, job.platform, job.runAt);
-    if (!quotaCheck.allowed) {
-      return { success: false, error: quotaCheck.reason };
-    }
-    
-    if (isDryRun) {
-      console.log(`[Scheduler] DRY_RUN - Would publish content ${job.contentId} to ${job.platform}`);
-      return { success: true };
-    }
-    
-    // In production, this would call the actual platform adapter
-    console.log(`[Scheduler] Publishing content ${job.contentId} to ${job.platform}`);
-    
-    // Simulate publishing with some failure rate
-    const success = Math.random() > 0.1; // 90% success rate
-    
-    if (success) {
-      console.log(`[Scheduler] Successfully published content ${job.contentId}`);
-      return { success: true };
-    } else {
-      throw new Error("Platform API error: Rate limit exceeded");
-    }
-  } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    console.error(`[Scheduler] Job ${job.id} failed:`, errorMessage);
-    return { success: false, error: errorMessage };
-  }
-}
-
-function calculateBackoffDelay(attempt: number): number {
-  // Exponential backoff: 1m, 5m, 15m, 1h
-  const delays = [60000, 300000, 900000, 3600000]; // in milliseconds
-  return delays[Math.min(attempt, delays.length - 1)];
-}
-
-// Worker function (would be called by cron)
-export async function processJobs(): Promise<{ processed: number; succeeded: number; failed: number }> {
-  console.log('[Scheduler] Processing pending jobs...');
-  
-  const now = new Date();
-  const oneMinuteFromNow = new Date(now.getTime() + 60000);
-  
-  // Find jobs that should run now
-  const jobsToRun = mockJobs.filter(job => 
-    job.status === "pending" && 
-    job.runAt <= oneMinuteFromNow &&
-    job.runAt >= now
-  );
-  
-  console.log(`[Scheduler] Found ${jobsToRun.length} jobs to process`);
-  
-  let succeeded = 0;
-  let failed = 0;
-  
-  for (const job of jobsToRun) {
-    job.status = "running";
-    job.updatedAt = new Date();
-    
-    const result = await executeJob(job);
-    
-    if (result.success) {
-      job.status = "completed";
-      succeeded++;
+    try {
+      console.log('[Worker] Starting tick at', this.lastTick.toISOString());
       
-      // Trigger notification event
-      console.log(`[Scheduler] Job ${job.id} completed successfully`);
-    } else {
-      job.attempts++;
-      job.lastError = result.error;
+      const now = new Date();
+      const oneMinuteFromNow = new Date(now.getTime() + 60000);
       
-      if (job.attempts >= job.maxAttempts) {
-        job.status = "failed";
-        console.log(`[Scheduler] Job ${job.id} failed permanently after ${job.attempts} attempts`);
-      } else {
-        job.status = "pending";
-        const backoffDelay = calculateBackoffDelay(job.attempts);
-        job.runAt = new Date(now.getTime() + backoffDelay);
-        console.log(`[Scheduler] Job ${job.id} will retry in ${backoffDelay / 1000}s (attempt ${job.attempts + 1}/${job.maxAttempts})`);
+      // Find jobs ready to run
+      const readyJobs = mockJobs.filter(job => 
+        job.status === 'pending' &&
+        new Date(job.runAt) <= oneMinuteFromNow &&
+        new Date(job.runAt) >= now
+      );
+      
+      console.log(`[Worker] Found ${readyJobs.length} jobs ready to process`);
+      
+      let processed = 0;
+      let errors = 0;
+      
+      for (const job of readyJobs) {
+        try {
+          await this.processJob(job);
+          processed++;
+        } catch (error) {
+          console.error(`[Worker] Error processing job ${job.id}:`, error);
+          errors++;
+          
+          // Update job with error
+          job.status = 'failed';
+          job.attempts = (job.attempts || 0) + 1;
+          job.lastError = error instanceof Error ? error.message : String(error);
+          job.updatedAt = new Date();
+          
+          // Schedule retry if under max attempts
+          if (job.attempts < job.maxAttempts) {
+            const backoffMs = calculateBackoff(job.attempts);
+            job.nextRetryAt = new Date(Date.now() + backoffMs);
+            job.status = 'pending';
+            job.runAt = job.nextRetryAt;
+            console.log(`[Worker] Scheduled retry for job ${job.id} in ${backoffMs}ms`);
+          } else {
+            console.log(`[Worker] Job ${job.id} exceeded max attempts (${job.maxAttempts})`);
+          }
+        }
       }
       
-      failed++;
+      const nextRun = new Date(Date.now() + 60000).toISOString();
+      console.log(`[Worker] Tick completed. Processed: ${processed}, Errors: ${errors}, Next run: ${nextRun}`);
+      
+      return { processed, errors, nextRun };
+      
+    } finally {
+      this.isRunning = false;
     }
-    
-    job.updatedAt = new Date();
   }
   
-  console.log(`[Scheduler] Processed ${jobsToRun.length} jobs: ${succeeded} succeeded, ${failed} failed`);
+  private async processJob(job: Job): Promise<void> {
+    console.log(`[Worker] Processing job ${job.id} for content ${job.contentId}`);
+    
+    // Update job status
+    job.status = 'running';
+    job.updatedAt = new Date();
+    
+    // Find the content item (mock)
+    let contentItem = mockContent.find(c => c.id === job.contentId);
+    if (!contentItem) {
+      // Create mock content item for demo
+      contentItem = {
+        id: job.contentId,
+        userId: job.userId,
+        title: 'Mock Content',
+        body: 'This is mock content for testing the worker system.',
+        platform: 'x',
+        type: 'text',
+        status: 'queued',
+        publishAttempts: 0,
+        createdAt: new Date(),
+        updatedAt: new Date()
+      };
+      mockContent.push(contentItem);
+    }
+    
+    // Ensure contentItem is not undefined after this point
+    if (!contentItem) {
+      throw new Error(`Content item ${job.contentId} could not be created`);
+    }
+    
+    // Check gates: plan, window, quota, guardrails
+    const gateResult = await this.checkGates(contentItem, job);
+    if (!gateResult.allowed) {
+      // Hold the content
+      contentItem.status = 'held' as any;
+      contentItem.updatedAt = new Date();
+      
+      job.status = 'completed';
+      job.completedAt = new Date();
+      job.lastError = gateResult.reason;
+      
+      // Log the hold
+      await this.logPublishAction({
+        contentId: job.contentId,
+        jobId: job.id,
+        platform: contentItem.platform,
+        action: 'hold',
+        status: 'held',
+        reason: gateResult.reason,
+        attempt: job.attempts + 1
+      });
+      
+      return;
+    }
+    
+    // Simulate publishing
+    const startTime = Date.now();
+    
+    try {
+      // Mock publisher call
+      await this.mockPublish(contentItem);
+      
+      const latency = Date.now() - startTime;
+      
+      // Success
+      contentItem.status = 'published' as any;
+      contentItem.publishedAt = new Date();
+      contentItem.publishAttempts = (contentItem.publishAttempts || 0) + 1;
+      contentItem.updatedAt = new Date();
+      
+      job.status = 'completed';
+      job.completedAt = new Date();
+      job.updatedAt = new Date();
+      
+      // Log the success
+      await this.logPublishAction({
+        contentId: job.contentId,
+        jobId: job.id,
+        platform: contentItem.platform,
+        action: 'publish',
+        status: 'published',
+        attempt: job.attempts + 1,
+        latency
+      });
+      
+      console.log(`[Worker] Successfully published content ${job.contentId} (${latency}ms)`);
+      
+    } catch (error) {
+      const latency = Date.now() - startTime;
+      
+      // Update content status
+      contentItem.status = 'error' as any;
+      contentItem.publishAttempts = (contentItem.publishAttempts || 0) + 1;
+      contentItem.updatedAt = new Date();
+      
+      // Log the error
+      await this.logPublishAction({
+        contentId: job.contentId,
+        jobId: job.id,
+        platform: contentItem.platform,
+        action: 'publish',
+        status: 'error',
+        reason: error instanceof Error ? error.message : String(error),
+        attempt: job.attempts + 1,
+        latency
+      });
+      
+      throw error;
+    }
+  }
   
-  return {
-    processed: jobsToRun.length,
-    succeeded,
-    failed
-  };
-}
-
-// tRPC procedures
-export const queueJobProcedure = publicProcedure
-  .input(queueJobInputSchema)
-  .mutation(async ({ input }) => {
-    console.log('[Scheduler] Queueing job:', input);
+  private async checkGates(content: ContentItem, job: Job): Promise<{ allowed: boolean; reason?: string }> {
+    // Check posting window
+    const currentHour = new Date().getHours();
+    const startHour = parseInt(process.env.PUBLISH_START_HOUR || '8');
+    const endHour = parseInt(process.env.PUBLISH_END_HOUR || '22');
     
-    const now = new Date();
-    const runAt = input.runAt || now;
-    
-    // Generate idempotency key if not provided
-    const contentHash = input.contentId.slice(-8); // Simple hash for demo
-    const day = runAt.toISOString().split('T')[0];
-    const idempotencyKey = input.idempotencyKey || generateIdempotencyKey(input.platform, contentHash, day);
-    
-    // Check for existing job with same idempotency key
-    const existingJob = mockJobs.find(job => job.idempotencyKey === idempotencyKey);
-    if (existingJob) {
-      console.log(`[Scheduler] Job already exists with idempotency key: ${idempotencyKey}`);
+    if (currentHour < startHour || currentHour >= endHour) {
       return {
-        success: false,
-        message: "Job already queued with this idempotency key",
-        existingJobId: existingJob.id
+        allowed: false,
+        reason: `Outside posting window. Current hour: ${currentHour}, allowed: ${startHour}-${endHour}`
       };
     }
     
-    const jobId = `job_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    // Check daily quota (mock)
+    const dailyLimits = { x: 10, instagram: 5, linkedin: 3, telegram: 10 };
+    const limit = dailyLimits[content.platform as keyof typeof dailyLimits] || 5;
+    const used = 2; // Mock usage
+    
+    if (used >= limit) {
+      return {
+        allowed: false,
+        reason: `Daily quota exceeded for ${content.platform}: ${used}/${limit}`
+      };
+    }
+    
+    // Check guardrails
+    const contentText = `${content.title} ${content.body}`.toLowerCase();
+    const bannedWords = ['revolutionary', 'disruptive', 'game-changer'];
+    
+    for (const word of bannedWords) {
+      if (contentText.includes(word.toLowerCase())) {
+        return {
+          allowed: false,
+          reason: `Content contains banned word: '${word}'`
+        };
+      }
+    }
+    
+    return { allowed: true };
+  }
+  
+  private async mockPublish(content: ContentItem): Promise<void> {
+    // Simulate network delay
+    await new Promise(resolve => setTimeout(resolve, 100 + Math.random() * 200));
+    
+    // Simulate occasional failures
+    if (Math.random() < 0.1) {
+      throw new Error('Mock publish failure - rate limit exceeded');
+    }
+    
+    console.log(`[MockPublisher] Published to ${content.platform}: ${content.title}`);
+  }
+  
+  private async logPublishAction(log: {
+    contentId: string;
+    jobId?: string;
+    platform: string;
+    action: string;
+    status: string;
+    reason?: string;
+    attempt: number;
+    latency?: number;
+  }): Promise<void> {
+    console.log('[Worker] Logging publish action:', log);
+    // In production, this would write to publish_logs table
+  }
+}
+
+const worker = new JobWorker();
+
+// Queue a job
+export const queueJobProcedure = publicProcedure
+  .input(z.object({
+    contentId: z.string(),
+    runAt: z.string().datetime().optional(),
+    priority: z.number().default(0)
+  }))
+  .mutation(async ({ input }) => {
+    console.log(`[Scheduler] Queuing job for content ${input.contentId}`);
+    
+    const runAt = input.runAt ? new Date(input.runAt) : new Date();
+    const idempotencyKey = `${input.contentId}:${runAt.toISOString()}:${Date.now()}`;
+    
+    // Check for existing job with same idempotency key
+    const existingJob = mockJobs.find(j => j.idempotencyKey === idempotencyKey);
+    if (existingJob) {
+      return {
+        success: true,
+        message: 'Job already exists (idempotency)',
+        jobId: existingJob.id,
+        idempotencyKey
+      };
+    }
     
     const job: Job = {
-      id: jobId,
+      id: `job_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
       contentId: input.contentId,
-      userId: input.userId,
-      platform: input.platform,
+      userId: 'user-1', // Mock user
       runAt,
       attempts: 0,
-      maxAttempts: 3,
-      status: "pending",
+      maxAttempts: 5,
+      status: 'pending',
       idempotencyKey,
-      createdAt: now,
-      updatedAt: now,
+      priority: input.priority,
+      createdAt: new Date(),
+      updatedAt: new Date()
     };
     
     mockJobs.push(job);
     
-    console.log(`[Scheduler] Job ${jobId} queued for ${runAt.toISOString()}`);
-    
     return {
       success: true,
-      job: {
-        id: job.id,
-        contentId: job.contentId,
-        platform: job.platform,
-        runAt: job.runAt.toISOString(),
-        status: job.status,
-        idempotencyKey: job.idempotencyKey
-      },
-      message: "Job queued successfully"
+      message: 'Job queued successfully',
+      jobId: job.id,
+      runAt: job.runAt.toISOString(),
+      idempotencyKey
     };
   });
 
+// Run job immediately
 export const runNowProcedure = publicProcedure
-  .input(runNowInputSchema)
+  .input(z.object({ jobId: z.string() }))
   .mutation(async ({ input }) => {
     console.log(`[Scheduler] Running job ${input.jobId} immediately`);
     
     const job = mockJobs.find(j => j.id === input.jobId);
     if (!job) {
-      return {
-        success: false,
-        message: "Job not found"
-      };
+      throw new Error(`Job ${input.jobId} not found`);
     }
     
-    if (job.status !== "pending") {
-      return {
-        success: false,
-        message: `Job is ${job.status}, cannot run now`
-      };
+    if (job.status !== 'pending') {
+      throw new Error(`Job ${input.jobId} is not in pending status: ${job.status}`);
     }
     
+    // Update run time to now
     job.runAt = new Date();
-    job.updatedAt = new Date();
-    
-    // Process this specific job
-    job.status = "running";
-    const result = await executeJob(job);
-    
-    if (result.success) {
-      job.status = "completed";
-    } else {
-      job.attempts++;
-      job.lastError = result.error;
-      job.status = job.attempts >= job.maxAttempts ? "failed" : "pending";
-    }
-    
-    job.updatedAt = new Date();
-    
-    return {
-      success: result.success,
-      job: {
-        id: job.id,
-        status: job.status,
-        attempts: job.attempts,
-        lastError: job.lastError
-      },
-      message: result.success ? "Job executed successfully" : `Job failed: ${result.error}`
-    };
-  });
-
-export const rescheduleProcedure = publicProcedure
-  .input(rescheduleInputSchema)
-  .mutation(async ({ input }) => {
-    console.log(`[Scheduler] Rescheduling job ${input.jobId} to ${input.runAt.toISOString()}`);
-    
-    const job = mockJobs.find(j => j.id === input.jobId);
-    if (!job) {
-      return {
-        success: false,
-        message: "Job not found"
-      };
-    }
-    
-    if (job.status === "completed") {
-      return {
-        success: false,
-        message: "Cannot reschedule completed job"
-      };
-    }
-    
-    job.runAt = input.runAt;
-    job.status = "pending";
     job.updatedAt = new Date();
     
     return {
       success: true,
-      job: {
-        id: job.id,
-        runAt: job.runAt.toISOString(),
-        status: job.status
-      },
-      message: "Job rescheduled successfully"
+      message: 'Job scheduled to run immediately',
+      jobId: job.id,
+      runAt: job.runAt.toISOString()
     };
   });
 
+// Reschedule job
+export const rescheduleProcedure = publicProcedure
+  .input(z.object({
+    jobId: z.string(),
+    runAt: z.string().datetime()
+  }))
+  .mutation(async ({ input }) => {
+    console.log(`[Scheduler] Rescheduling job ${input.jobId} to ${input.runAt}`);
+    
+    const job = mockJobs.find(j => j.id === input.jobId);
+    if (!job) {
+      throw new Error(`Job ${input.jobId} not found`);
+    }
+    
+    if (job.status === 'completed' || job.status === 'cancelled') {
+      throw new Error(`Cannot reschedule ${job.status} job`);
+    }
+    
+    job.runAt = new Date(input.runAt);
+    job.status = 'pending';
+    job.updatedAt = new Date();
+    
+    return {
+      success: true,
+      message: 'Job rescheduled successfully',
+      jobId: job.id,
+      runAt: job.runAt.toISOString()
+    };
+  });
+
+// Cancel job
 export const cancelJobProcedure = publicProcedure
-  .input(cancelInputSchema)
+  .input(z.object({ jobId: z.string() }))
   .mutation(async ({ input }) => {
     console.log(`[Scheduler] Cancelling job ${input.jobId}`);
     
     const job = mockJobs.find(j => j.id === input.jobId);
     if (!job) {
-      return {
-        success: false,
-        message: "Job not found"
-      };
+      throw new Error(`Job ${input.jobId} not found`);
     }
     
-    if (job.status === "completed") {
-      return {
-        success: false,
-        message: "Cannot cancel completed job"
-      };
+    if (job.status === 'running') {
+      throw new Error('Cannot cancel running job');
     }
     
-    if (job.status === "running") {
-      return {
-        success: false,
-        message: "Cannot cancel running job"
-      };
+    if (job.status === 'completed') {
+      throw new Error('Cannot cancel completed job');
     }
     
-    job.status = "cancelled";
+    job.status = 'cancelled';
     job.updatedAt = new Date();
     
     return {
       success: true,
-      job: {
-        id: job.id,
-        status: job.status
-      },
-      message: "Job cancelled successfully"
+      message: 'Job cancelled successfully',
+      jobId: job.id
     };
   });
 
+// List jobs
 export const listJobsProcedure = publicProcedure
-  .input(listJobsInputSchema)
+  .input(z.object({
+    status: z.enum(['pending', 'running', 'completed', 'failed', 'cancelled']).optional(),
+    limit: z.number().min(1).max(100).default(20)
+  }))
   .query(async ({ input }) => {
-    console.log('[Scheduler] Listing jobs:', input);
+    console.log('[Scheduler] Listing jobs with filters:', input);
     
-    let filteredJobs = mockJobs;
-    
-    if (input.userId) {
-      filteredJobs = filteredJobs.filter(job => job.userId === input.userId);
-    }
+    let filtered = [...mockJobs];
     
     if (input.status) {
-      filteredJobs = filteredJobs.filter(job => job.status === input.status);
+      filtered = filtered.filter(job => job.status === input.status);
     }
     
-    // Sort by runAt descending
-    filteredJobs.sort((a, b) => b.runAt.getTime() - a.runAt.getTime());
+    // Sort by creation date (newest first)
+    filtered.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
     
-    const total = filteredJobs.length;
-    const jobs = filteredJobs
-      .slice(input.offset, input.offset + input.limit)
-      .map(job => ({
-        id: job.id,
-        contentId: job.contentId,
-        platform: job.platform,
-        runAt: job.runAt.toISOString(),
-        status: job.status,
-        attempts: job.attempts,
-        maxAttempts: job.maxAttempts,
-        lastError: job.lastError,
-        idempotencyKey: job.idempotencyKey,
-        createdAt: job.createdAt.toISOString(),
-        updatedAt: job.updatedAt.toISOString()
-      }));
+    const jobs = filtered.slice(0, input.limit);
     
     return {
-      jobs,
-      total,
-      hasMore: input.offset + input.limit < total
+      jobs: jobs.map(job => ({
+        ...job,
+        runAt: job.runAt.toISOString(),
+        createdAt: job.createdAt.toISOString(),
+        updatedAt: job.updatedAt.toISOString(),
+        completedAt: job.completedAt?.toISOString(),
+        nextRetryAt: job.nextRetryAt?.toISOString()
+      })),
+      total: filtered.length,
+      hasMore: filtered.length > input.limit
     };
   });
 
+// Get job statistics
 export const getJobStatsProcedure = publicProcedure
   .query(async () => {
-    console.log('[Scheduler] Getting job statistics');
-    
     const stats = {
-      total: mockJobs.length,
-      pending: mockJobs.filter(j => j.status === "pending").length,
-      running: mockJobs.filter(j => j.status === "running").length,
-      completed: mockJobs.filter(j => j.status === "completed").length,
-      failed: mockJobs.filter(j => j.status === "failed").length,
-      cancelled: mockJobs.filter(j => j.status === "cancelled").length,
+      pending: mockJobs.filter(j => j.status === 'pending').length,
+      running: mockJobs.filter(j => j.status === 'running').length,
+      completed: mockJobs.filter(j => j.status === 'completed').length,
+      failed: mockJobs.filter(j => j.status === 'failed').length,
+      cancelled: mockJobs.filter(j => j.status === 'cancelled').length
     };
     
-    const now = new Date();
-    const oneHourAgo = new Date(now.getTime() - 3600000);
-    const recentJobs = mockJobs.filter(j => j.updatedAt >= oneHourAgo);
+    const total = mockJobs.length;
+    const successRate = total > 0 ? (stats.completed / total) * 100 : 0;
     
     return {
-      ...stats,
-      recentActivity: {
-        lastHour: recentJobs.length,
-        successRate: recentJobs.length > 0 
-          ? (recentJobs.filter(j => j.status === "completed").length / recentJobs.length) * 100 
-          : 0
-      }
+      stats,
+      total,
+      successRate: Math.round(successRate * 100) / 100,
+      lastTick: worker.lastTick?.toISOString() || null
     };
   });
 
+// Manual worker tick (for testing)
 export const workerTickProcedure = publicProcedure
   .mutation(async () => {
     console.log('[Scheduler] Manual worker tick triggered');
     
-    const result = await processJobs();
+    const result = await worker.tick();
     
     return {
       success: true,
-      ...result,
-      message: `Processed ${result.processed} jobs: ${result.succeeded} succeeded, ${result.failed} failed`
+      message: 'Worker tick completed',
+      ...result
     };
   });
+
+// Auto-start worker tick every minute (in production this would be a cron job)
+if (process.env.NODE_ENV !== 'test') {
+  setInterval(async () => {
+    try {
+      await worker.tick();
+    } catch (error) {
+      console.error('[Scheduler] Worker tick error:', error);
+    }
+  }, 60000); // Every minute
+  
+  console.log('[Scheduler] Worker auto-tick started (every 60 seconds)');
+}

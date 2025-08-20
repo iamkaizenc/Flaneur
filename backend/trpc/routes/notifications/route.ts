@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { publicProcedure } from "../../create-context";
 import crypto from "crypto";
+import type { Webhook, NotificationHistory } from "../../../types/schemas";
 
 // Event types for notifications
 const NotificationEventSchema = z.enum([
@@ -11,8 +12,6 @@ const NotificationEventSchema = z.enum([
   "insight.created",
   "fameScore.weeklyDelta"
 ]);
-
-type NotificationEvent = z.infer<typeof NotificationEventSchema>;
 
 // Notification channel types
 const NotificationChannelSchema = z.enum(["push", "email", "telegram", "webhook"]);
@@ -71,22 +70,13 @@ const getNotificationHistoryInputSchema = z.object({
 });
 
 // Mock storage for webhooks and subscriptions
-let mockWebhooks: {
-  id: string;
-  userId: string;
-  url: string;
-  secret: string;
-  events: NotificationEvent[];
-  name?: string;
-  createdAt: string;
-  lastTriggered?: string;
-  status: "active" | "failed" | "disabled";
-}[] = [];
+let mockWebhooks: Webhook[] = [];
+let mockNotificationHistory: NotificationHistory[] = [];
 
 let mockSubscriptions: {
   userId: string;
   pushToken?: string;
-  events: NotificationEvent[];
+  events: string[];
   channels: string[];
   createdAt: string;
 }[] = [];
@@ -111,37 +101,98 @@ function maskSensitiveData(data: any): any {
   return masked;
 }
 
-async function sendWebhookNotification(webhook: any, event: NotificationEvent, payload: any) {
+async function sendWebhookNotification(webhook: Webhook, event: string, payload: any, attempt: number = 1): Promise<{ success: boolean; error?: string; signature?: string }> {
+  const maxAttempts = 3;
   const isDryRun = process.env.DRY_RUN === "true" || process.env.DRY_RUN === "1";
+  
+  const webhookPayload = {
+    event,
+    userId: webhook.userId,
+    data: maskSensitiveData(payload),
+    timestamp: new Date().toISOString()
+  };
+  
+  const payloadString = JSON.stringify(webhookPayload);
+  const signature = generateHMACSignature(payloadString, webhook.secret);
   
   if (isDryRun) {
     console.log(`[Webhook] DRY_RUN - Would send to ${webhook.url}:`, { event, payload: maskSensitiveData(payload) });
-    return { success: true, dryRun: true };
+    
+    // Log success in dry run
+    mockNotificationHistory.push({
+      id: `webhook_${Date.now()}`,
+      userId: webhook.userId,
+      type: event,
+      channel: 'webhook',
+      recipient: webhook.url,
+      body: payloadString,
+      status: 'sent',
+      createdAt: new Date(),
+      sentAt: new Date()
+    });
+    
+    return { success: true, signature };
   }
   
   try {
-    const maskedPayload = maskSensitiveData(payload);
-    const payloadString = JSON.stringify({ event, data: maskedPayload, timestamp: new Date().toISOString() });
-    const signature = generateHMACSignature(payloadString, webhook.secret);
-    
     // In production, this would make an actual HTTP request
-    console.log(`[Webhook] Sending to ${webhook.url} with signature: ${signature}`);
-    console.log(`[Webhook] Payload:`, payloadString);
+    const response = await fetch(webhook.url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-flaneur-signature': signature,
+        'User-Agent': 'Flaneur-Webhook/1.0'
+      },
+      body: payloadString
+    });
     
-    // Simulate webhook delivery with retry logic
-    const success = Math.random() > 0.1; // 90% success rate
-    
-    if (success) {
-      webhook.lastTriggered = new Date().toISOString();
-      webhook.status = "active";
-      return { success: true, signature };
-    } else {
-      webhook.status = "failed";
-      throw new Error("Webhook delivery failed");
+    if (!response.ok) {
+      throw new Error(`Webhook responded with ${response.status}: ${response.statusText}`);
     }
+    
+    console.log(`[Webhook] Successfully sent to ${webhook.url}`);
+    
+    // Log success
+    mockNotificationHistory.push({
+      id: `webhook_${Date.now()}`,
+      userId: webhook.userId,
+      type: event,
+      channel: 'webhook',
+      recipient: webhook.url,
+      body: payloadString,
+      status: 'delivered',
+      createdAt: new Date(),
+      sentAt: new Date()
+    });
+    
+    return { success: true, signature };
+    
   } catch (error) {
-    console.error(`[Webhook] Failed to send to ${webhook.url}:`, error);
-    return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
+    console.error(`[Webhook] Failed to send to ${webhook.url} (attempt ${attempt}/${maxAttempts}):`, error);
+    
+    if (attempt < maxAttempts) {
+      // Exponential backoff: 1s, 5s, 15s
+      const backoffMs = Math.pow(5, attempt) * 1000;
+      console.log(`[Webhook] Retrying in ${backoffMs}ms`);
+      
+      await new Promise(resolve => setTimeout(resolve, backoffMs));
+      return sendWebhookNotification(webhook, event, payload, attempt + 1);
+    } else {
+      // Log final failure
+      mockNotificationHistory.push({
+        id: `webhook_${Date.now()}`,
+        userId: webhook.userId,
+        type: event,
+        channel: 'webhook',
+        recipient: webhook.url,
+        body: payloadString,
+        status: 'failed',
+        error: error instanceof Error ? error.message : String(error),
+        createdAt: new Date()
+      });
+      
+      return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
+    }
   }
 }
 
@@ -198,7 +249,7 @@ async function sendTelegramNotification(userId: string, title: string, body: str
   return { success, messageId: `telegram_${Date.now()}` };
 }
 
-async function publishNotificationEvent(event: NotificationEvent, payload: any) {
+async function publishNotificationEvent(event: string, payload: any) {
   console.log(`[Event] Publishing ${event}:`, maskSensitiveData(payload));
   
   // Find all subscriptions for this event
@@ -245,7 +296,7 @@ async function publishNotificationEvent(event: NotificationEvent, payload: any) 
   
   // Send to webhooks
   const relevantWebhooks = mockWebhooks.filter(webhook => 
-    webhook.events.includes(event) && webhook.status === "active"
+    webhook.events.includes(event) && webhook.active
   );
   
   for (const webhook of relevantWebhooks) {
@@ -386,17 +437,15 @@ export const webhookRegisterProcedure = publicProcedure
   .mutation(async ({ input }) => {
     console.log('[Webhooks] Registering webhook:', { url: input.url, events: input.events });
     
-    const webhookId = `webhook_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-    
-    const webhook = {
-      id: webhookId,
+    const webhook: Webhook = {
+      id: `webhook_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
       userId: input.userId,
       url: input.url,
       secret: input.secret,
       events: input.events,
-      name: input.name || `Webhook ${webhookId}`,
-      createdAt: new Date().toISOString(),
-      status: "active" as const
+      active: true,
+      createdAt: new Date(),
+      updatedAt: new Date()
     };
     
     mockWebhooks.push(webhook);
@@ -407,9 +456,9 @@ export const webhookRegisterProcedure = publicProcedure
         id: webhook.id,
         url: webhook.url,
         events: webhook.events,
-        name: webhook.name,
-        createdAt: webhook.createdAt,
-        status: webhook.status
+        active: webhook.active,
+        createdAt: webhook.createdAt.toISOString(),
+        updatedAt: webhook.updatedAt.toISOString()
       },
       message: "Webhook registered successfully"
     };
@@ -426,10 +475,9 @@ export const webhookListProcedure = publicProcedure
         id: w.id,
         url: w.url,
         events: w.events,
-        name: w.name,
-        createdAt: w.createdAt,
-        lastTriggered: w.lastTriggered,
-        status: w.status
+        active: w.active,
+        createdAt: w.createdAt.toISOString(),
+        updatedAt: w.updatedAt.toISOString()
       }));
     
     return {

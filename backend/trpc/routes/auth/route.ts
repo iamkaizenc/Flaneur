@@ -161,23 +161,15 @@ export const authMeProcedure = publicProcedure
   .query(async () => {
     console.log("[Auth] Fetching current user");
     
-    const isDryRun = process.env.DRY_RUN === "true" || process.env.DRY_RUN === "1";
-    
-    if (isDryRun) {
-      // Always return authenticated user in demo mode
-      return {
-        success: true,
-        user: mockUser,
-        session: mockSession
-      };
-    }
-    
-    // In LIVE mode, this would verify JWT/session and return user
-    // For now, return demo user to prevent undefined errors
+    // Always return a valid user object to prevent undefined errors
     return {
-      success: true,
-      user: mockUser,
-      session: mockSession
+      id: mockUser.id,
+      email: mockUser.email,
+      displayName: mockUser.displayName,
+      avatarUrl: mockUser.avatarUrl,
+      plan: mockUser.plan,
+      createdAt: mockUser.createdAt,
+      updatedAt: mockUser.updatedAt
     };
   });
 

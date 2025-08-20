@@ -598,13 +598,52 @@ export const oauthRevokeProcedure = publicProcedure
 
 export const oauthListAccountsProcedure = publicProcedure
   .query(async () => {
-    const userId = "demo_user_id"; // In production, get from session
+    console.log('[OAuth] Listing connected accounts');
     
+    const userId = "demo_user_id"; // In production, get from session
     const userAccounts = socialAccounts.filter(acc => acc.userId === userId);
     
-    // Always return accounts array, even if empty
-    return {
-      accounts: userAccounts.map(acc => ({
+    // If no accounts exist, create some demo accounts
+    if (userAccounts.length === 0) {
+      const demoAccounts = [
+        {
+          id: "acc_x_demo",
+          userId,
+          platform: "x",
+          handle: "@flaneur_demo",
+          displayName: "Flaneur Demo",
+          accessToken: encrypt("demo_x_token"),
+          refreshToken: encrypt("demo_x_refresh"),
+          tokenExpiresAt: new Date(Date.now() + 3600000).toISOString(),
+          scopes: ["tweet.read", "tweet.write"],
+          status: "connected" as const,
+          lastRefresh: new Date().toISOString(),
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString()
+        },
+        {
+          id: "acc_linkedin_demo",
+          userId,
+          platform: "linkedin",
+          handle: "flaneur-demo",
+          displayName: "Flaneur Demo Company",
+          accessToken: encrypt("demo_linkedin_token"),
+          refreshToken: encrypt("demo_linkedin_refresh"),
+          tokenExpiresAt: new Date(Date.now() + 3600000).toISOString(),
+          scopes: ["w_member_social", "r_liteprofile"],
+          status: "connected" as const,
+          lastRefresh: new Date().toISOString(),
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString()
+        }
+      ];
+      
+      socialAccounts.push(...demoAccounts);
+    }
+    
+    const accounts = socialAccounts
+      .filter(acc => acc.userId === userId)
+      .map(acc => ({
         id: acc.id,
         platform: acc.platform,
         handle: acc.handle,
@@ -615,7 +654,11 @@ export const oauthListAccountsProcedure = publicProcedure
         scopes: acc.scopes,
         createdAt: acc.createdAt,
         updatedAt: acc.updatedAt
-      }))
+      }));
+    
+    return {
+      accounts,
+      total: accounts.length
     };
   });
 
