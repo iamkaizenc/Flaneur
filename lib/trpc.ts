@@ -486,6 +486,53 @@ const getBaseUrl = () => {
   return 'http://localhost:8081';
 };
 
+// Test function to check backend connectivity
+export const testBackendConnection = async (): Promise<{ success: boolean; message: string; details?: any }> => {
+  try {
+    const baseUrl = getBaseUrl();
+    const healthUrl = `${baseUrl}/api/health`;
+    
+    console.log('[tRPC] Testing backend connection to:', healthUrl);
+    
+    const response = await fetch(healthUrl, {
+      method: 'GET',
+      headers: {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json'
+      }
+    });
+    
+    console.log('[tRPC] Health check response status:', response.status);
+    console.log('[tRPC] Health check response headers:', Object.fromEntries(response.headers.entries()));
+    
+    if (!response.ok) {
+      const text = await response.text();
+      console.error('[tRPC] Health check failed:', text.substring(0, 200));
+      return {
+        success: false,
+        message: `Backend health check failed: ${response.status} ${response.statusText}`,
+        details: { status: response.status, response: text.substring(0, 200) }
+      };
+    }
+    
+    const data = await response.json();
+    console.log('[tRPC] Health check successful:', data);
+    
+    return {
+      success: true,
+      message: 'Backend is accessible and responding',
+      details: data
+    };
+  } catch (error) {
+    console.error('[tRPC] Backend connection test failed:', error);
+    return {
+      success: false,
+      message: `Cannot connect to backend: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      details: { error: error instanceof Error ? error.message : String(error) }
+    };
+  }
+};
+
 
 
 
@@ -498,6 +545,11 @@ export const trpcClient = trpc.createClient({
       fetch: async (url, options) => {
         try {
           console.log('[tRPC] Making request to:', url);
+          console.log('[tRPC] Request options:', {
+            method: options?.method || 'GET',
+            headers: options?.headers,
+            body: options?.body ? 'present' : 'none'
+          });
           
           const response = await fetch(url, {
             ...options,

@@ -11,6 +11,7 @@ import {
   Platform,
   Modal,
   Image,
+  Linking,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import * as ImagePicker from "expo-image-picker";
@@ -50,7 +51,7 @@ import {
   Minus,
 } from "lucide-react-native";
 import { theme, brandName } from "@/constants/theme";
-import { trpc, trpcClient } from "@/lib/trpc";
+import { trpc, trpcClient, testBackendConnection } from "@/lib/trpc";
 import { usePurchase } from "@/hooks/usePurchase";
 import { LanguagePicker } from "../../src/components/LanguagePicker";
 
@@ -454,7 +455,7 @@ export default function SettingsScreen() {
   
   const { purchasePlan, restorePurchases, isLoading: purchaseLoading } = usePurchase();
 
-  const isLiveMode = process.env.LIVE_MODE === "true";
+  const isLiveMode = process.env.EXPO_PUBLIC_LIVE_MODE === "true" || process.env.LIVE_MODE === "true";
   const availablePlatforms = ["x", "instagram", "facebook", "linkedin", "tiktok", "telegram"];
   
   const handleConnect = async (platform: string) => {
@@ -477,11 +478,10 @@ export default function SettingsScreen() {
           if (Platform.OS === 'web') {
             window.open(result.authUrl, '_blank');
           } else {
-            Alert.alert(
-              "Connect Account",
-              `Opening ${getPlatformConfig(platform).name} authorization in browser...`,
-              [{ text: "OK" }]
-            );
+            // Open the OAuth URL in the device's browser
+            Linking.openURL(result.authUrl).catch(() => {
+              Alert.alert("Error", "Could not open authorization URL");
+            });
           }
         } else {
           // In DRY_RUN mode, simulate successful connection
@@ -551,11 +551,10 @@ export default function SettingsScreen() {
           if (Platform.OS === 'web') {
             window.open(result.authUrl, '_blank');
           } else {
-            Alert.alert(
-              "Fix Connection",
-              `Opening ${getPlatformConfig(platform).name} re-authorization in browser...`,
-              [{ text: "OK" }]
-            );
+            // Open the OAuth URL in the device's browser
+            Linking.openURL(result.authUrl).catch(() => {
+              Alert.alert("Error", "Could not open authorization URL");
+            });
           }
         } else {
           Alert.alert(
@@ -1211,6 +1210,23 @@ export default function SettingsScreen() {
         {/* Developer Section */}
         <SectionHeader title="Developer" icon={<Code size={20} color={theme.colors.white} />} />
         <View style={styles.section}>
+          <SettingItem
+            title="Test Backend Connection"
+            subtitle="Check if backend server is accessible"
+            onPress={async () => {
+              try {
+                const result = await testBackendConnection();
+                Alert.alert(
+                  result.success ? "Backend Connected" : "Backend Error",
+                  result.message + (result.details ? `\n\nDetails: ${JSON.stringify(result.details, null, 2)}` : ""),
+                  [{ text: "OK" }]
+                );
+              } catch (error) {
+                Alert.alert("Test Failed", `Failed to test backend: ${error}`);
+              }
+            }}
+            rightElement={<Activity size={16} color={theme.colors.gray[400]} />}
+          />
           <SettingItem
             title="API Health"
             subtitle="/api/health endpoint status"

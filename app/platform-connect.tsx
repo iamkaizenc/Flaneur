@@ -8,6 +8,7 @@ import {
   Platform,
   Alert,
   ActivityIndicator,
+  Linking,
 } from "react-native";
 import { router } from "expo-router";
 import { 
@@ -73,8 +74,9 @@ export default function PlatformConnectScreen() {
   
   // Check if we're in LIVE mode
   useEffect(() => {
-    // In a real app, this would come from environment or settings
-    setIsLiveMode(process.env.LIVE_MODE === 'true');
+    setIsLiveMode(
+      process.env.EXPO_PUBLIC_LIVE_MODE === "true" || process.env.LIVE_MODE === "true"
+    );
   }, []);
 
   const platforms = [
@@ -108,41 +110,59 @@ export default function PlatformConnectScreen() {
           ]
         );
       } else if (startResult.authUrl) {
-        // For demo purposes, simulate successful OAuth
-        console.log(`[Platform Connect] Would redirect to: ${startResult.authUrl}`);
+        console.log(`[Platform Connect] OAuth URL for ${platformKey}:`, startResult.authUrl);
         
-        // Simulate OAuth callback
-        setTimeout(async () => {
-          try {
-            const callbackResult = await oauthCallbackMutation.mutateAsync({
-              platform: platformKey as any,
-              code: "demo_auth_code",
-              state: startResult.state
-            });
-            
-            if (callbackResult.success) {
-              connectPlatform(platformName);
-              Alert.alert(
-                "Success",
-                `${platformName} connected successfully!${isLiveMode ? '' : ' (Demo Mode)'}`,
-                [{ text: "OK" }]
-              );
-            }
-          } catch (error) {
-            console.error(`[Platform Connect] Callback error:`, error);
-            Alert.alert(
-              "Connection Failed",
-              `Failed to connect ${platformName}. Please try again.`,
-              [{ text: "OK" }]
-            );
-          } finally {
-            setLoadingPlatforms(prev => {
-              const newSet = new Set(prev);
-              newSet.delete(platformName);
-              return newSet;
+        if (isLiveMode) {
+          // In LIVE mode, open the actual OAuth URL
+          if (Platform.OS === 'web') {
+            window.open(startResult.authUrl, '_blank');
+          } else {
+            // Open the OAuth URL in the device's browser
+            Linking.openURL(startResult.authUrl).catch(() => {
+              Alert.alert("Error", "Could not open authorization URL");
             });
           }
-        }, 2000);
+          
+          // In LIVE mode, we don't simulate the callback - it will come from the actual OAuth flow
+          setLoadingPlatforms(prev => {
+            const newSet = new Set(prev);
+            newSet.delete(platformName);
+            return newSet;
+          });
+        } else {
+          // DEMO mode: simulate successful OAuth
+          setTimeout(async () => {
+            try {
+              const callbackResult = await oauthCallbackMutation.mutateAsync({
+                platform: platformKey as any,
+                code: "demo_auth_code",
+                state: startResult.state
+              });
+              
+              if (callbackResult.success) {
+                connectPlatform(platformName);
+                Alert.alert(
+                  "Success",
+                  `${platformName} connected successfully! (Demo Mode)`,
+                  [{ text: "OK" }]
+                );
+              }
+            } catch (error) {
+              console.error(`[Platform Connect] Callback error:`, error);
+              Alert.alert(
+                "Connection Failed",
+                `Failed to connect ${platformName}. Please try again.`,
+                [{ text: "OK" }]
+              );
+            } finally {
+              setLoadingPlatforms(prev => {
+                const newSet = new Set(prev);
+                newSet.delete(platformName);
+                return newSet;
+              });
+            }
+          }, 2000);
+        }
       }
     } catch (error) {
       console.error(`[Platform Connect] Start error:`, error);
