@@ -3,7 +3,9 @@ import { publicProcedure, protectedProcedure } from "../../create-context";
 import Stripe from "stripe";
 
 // Initialize Stripe
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || 'sk_test_demo_key');
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || 'sk_test_demo_key', {
+  apiVersion: '2025-07-30.basil'
+});
 
 // Plan configuration
 const PLANS = {
@@ -292,9 +294,9 @@ export const webhookProcedure = publicProcedure
           
           mockPlanState.status = subscription.status === 'active' ? 'active' : 'canceled';
           // Handle current_period_end properly
-          const sub = subscription as any;
-          if (sub.current_period_end) {
-            mockPlanState.current_period_end = new Date(sub.current_period_end * 1000).toISOString();
+          const subscriptionData = subscription as any;
+          if (subscriptionData.current_period_end) {
+            mockPlanState.current_period_end = new Date(subscriptionData.current_period_end * 1000).toISOString();
           }
           break;
         }
