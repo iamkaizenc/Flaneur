@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next';
 
 const opts = [
   { code:'en', label:'English' },
+  { code:'es', label:'Español' },
   { code:'tr', label:'Türkçe' },
   { code:'ar', label:'العربية' },
   { code:'ko', label:'한국어' },

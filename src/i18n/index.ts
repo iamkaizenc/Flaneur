@@ -9,6 +9,7 @@ import zh from './locales/zh.json';
 import ptBR from './locales/pt-BR.json';
 import id from './locales/id.json';
 import tr from './locales/tr.json';
+import es from './locales/es.json';
 
 export const resources = {
   en: { translation: en },
@@ -18,11 +19,12 @@ export const resources = {
   'pt-BR': { translation: ptBR },
   id: { translation: id },
   tr: { translation: tr },
+  es: { translation: es },
 } satisfies Resource;
 
 const deviceLocales = Localization.getLocales();
 const tag = (deviceLocales[0]?.languageTag || 'en').replace('_','-');
-const guess = tag.startsWith('pt') ? 'pt-BR' : tag;
+const guess = tag.startsWith('pt') ? 'pt-BR' : tag.startsWith('es') ? 'es' : tag;
 
 i18n.use(initReactI18next).init({
   resources,

@@ -601,7 +601,7 @@ export const oauthListAccountsProcedure = publicProcedure
     console.log('[OAuth] Listing connected accounts');
     
     const userId = "demo_user_id"; // In production, get from session
-    const userAccounts = socialAccounts.filter(acc => acc.userId === userId);
+    let userAccounts = socialAccounts.filter(acc => acc.userId === userId);
     
     // If no accounts exist, create some demo accounts
     if (userAccounts.length === 0) {
@@ -639,25 +639,25 @@ export const oauthListAccountsProcedure = publicProcedure
       ];
       
       socialAccounts.push(...demoAccounts);
+      userAccounts = demoAccounts;
     }
     
-    const accounts = socialAccounts
-      .filter(acc => acc.userId === userId)
-      .map(acc => ({
-        id: acc.id,
-        platform: acc.platform,
-        handle: acc.handle,
-        displayName: acc.displayName,
-        status: acc.status,
-        lastRefresh: acc.lastRefresh,
-        tokenExpiresAt: acc.tokenExpiresAt,
-        scopes: acc.scopes,
-        createdAt: acc.createdAt,
-        updatedAt: acc.updatedAt
-      }));
+    const accounts = userAccounts.map(acc => ({
+      id: acc.id,
+      platform: acc.platform,
+      handle: acc.handle,
+      displayName: acc.displayName,
+      status: acc.status,
+      lastRefresh: acc.lastRefresh,
+      tokenExpiresAt: acc.tokenExpiresAt,
+      scopes: acc.scopes,
+      createdAt: acc.createdAt,
+      updatedAt: acc.updatedAt
+    }));
     
+    // Always return a valid response structure
     return {
-      accounts,
+      accounts: accounts || [],
       total: accounts.length
     };
   });

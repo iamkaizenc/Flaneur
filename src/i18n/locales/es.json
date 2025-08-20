@@ -1,0 +1,61 @@
+{
+  "brand": "Flâneur",
+  "tagline": "Agencia Autónoma de Redes Sociales",
+  "actions": {
+    "connect": "Conectar",
+    "disconnect": "Desconectar",
+    "fix": "Reparar",
+    "save": "Guardar",
+    "change_language": "Cambiar idioma"
+  },
+  "risk": {
+    "healthy": "👍 Visibilidad saludable",
+    "down": "⚠️ La visibilidad está disminuyendo",
+    "stable_performance": "Rendimiento estable en los últimos 7 días",
+    "risk_detected": "Riesgo detectado",
+    "recommendations": "Recomendaciones:",
+    "risk_center": "Centro de Riesgos",
+    "advice": {
+      "reduce_freq": "Reducir frecuencia de publicación",
+      "change_time": "Probar diferentes horarios de publicación",
+      "diversify": "Diversificar formato de contenido"
+    }
+  },
+  "growth": {
+    "weekly_growth": "Crecimiento Semanal",
+    "insights_title": "Insights de Esta Semana",
+    "fame_summary": "Resumen de Fama",
+    "detailed_report": "Ver Reporte Detallado",
+    "achievements": "Logros",
+    "weekly_challenge": "Desafío Semanal",
+    "days_left": "días restantes",
+    "claim_bonus": "Reclamar Bonus (+5 FameScore)",
+    "completed": "🎉 ¡Completado!",
+    "fame_score": "Puntuación de Fama",
+    "last_7_days_trend": "Tendencia de los Últimos 7 Días",
+    "streak": "Racha",
+    "your_path": "Tu Camino",
+    "personalized_strategy": "Estrategia personalizada",
+    "why_strategy": "¿Por qué esta estrategia?",
+    "photo": "Foto",
+    "video": "Video",
+    "ig_posts": "Posts de IG",
+    "publish_history": "Historial de Publicaciones",
+    "all_platforms": "Todas las Plataformas",
+    "all_statuses": "Todos los Estados",
+    "show_trace": "Mostrar Rastro"
+  },
+  "publish": {
+    "status": {
+      "draft": "Borrador",
+      "queued": "En Cola",
+      "published": "Publicado",
+      "held": "Retenido",
+      "error": "Error"
+    }
+  },
+  "settings": {
+    "language": "Idioma",
+    "sandbox": "Modo sandbox"
+  }
+}

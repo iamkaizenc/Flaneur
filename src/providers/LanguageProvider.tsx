@@ -4,7 +4,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Updates from 'expo-updates';
 import i18n from '../i18n';
 
-type Lang = 'en'|'ar'|'ko'|'zh'|'pt-BR'|'id'|'tr';
+type Lang = 'en'|'ar'|'ko'|'zh'|'pt-BR'|'id'|'tr'|'es';
 type Ctx = { lang: Lang; setLang: (l: Lang)=>Promise<void>; isRTL: boolean; };
 const C = createContext<Ctx>({ lang:'en', setLang: async()=>{}, isRTL:false });
 
