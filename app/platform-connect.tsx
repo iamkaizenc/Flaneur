@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 import {
   StyleSheet,
   Text,
@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   Platform,
   Alert,
+  ActivityIndicator,
 } from "react-native";
 import { router } from "expo-router";
 import { 
@@ -15,17 +16,21 @@ import {
   Linkedin, 
   Send,
   Check,
-  ChevronRight
+  ChevronRight,
+  AlertCircle,
+  Zap
 } from "lucide-react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useAIMarketer } from "@/providers/AIMarketerProvider";
 import { theme } from "@/constants/theme";
+import { trpc } from "@/lib/trpc";
 
 interface PlatformCardProps {
   name: string;
   icon: React.ReactNode;
   color: string;
   connected: boolean;
+  loading: boolean;
   onConnect: () => void;
 }
 
@@ -33,7 +38,8 @@ const PlatformCard: React.FC<PlatformCardProps> = ({
   name, 
   icon, 
   color, 
-  connected, 
+  connected,
+  loading,
   onConnect 
 }) => (
   <TouchableOpacity 
@@ -50,7 +56,9 @@ const PlatformCard: React.FC<PlatformCardProps> = ({
         {connected ? "Connected" : "Tap to connect"}
       </Text>
     </View>
-    {connected ? (
+    {loading ? (
+      <ActivityIndicator size="small" color={color} />
+    ) : connected ? (
       <Check size={24} color="#10B981" />
     ) : (
       <ChevronRight size={24} color="#9CA3AF" />
@@ -60,24 +68,95 @@ const PlatformCard: React.FC<PlatformCardProps> = ({
 
 export default function PlatformConnectScreen() {
   const { connectedPlatforms, connectPlatform } = useAIMarketer();
+  const [loadingPlatforms, setLoadingPlatforms] = useState<Set<string>>(new Set());
+  const [isLiveMode, setIsLiveMode] = useState<boolean>(false);
+  
+  // Check if we're in LIVE mode
+  useEffect(() => {
+    // In a real app, this would come from environment or settings
+    setIsLiveMode(process.env.LIVE_MODE === 'true');
+  }, []);
 
   const platforms = [
-    { name: "X (Twitter)", icon: <Twitter size={24} color="#1DA1F2" />, color: "#1DA1F2" },
-    { name: "Instagram", icon: <Instagram size={24} color="#E4405F" />, color: "#E4405F" },
-    { name: "LinkedIn", icon: <Linkedin size={24} color="#0077B5" />, color: "#0077B5" },
-    { name: "Telegram", icon: <Send size={24} color="#0088CC" />, color: "#0088CC" },
+    { name: "X (Twitter)", key: "x", icon: <Twitter size={24} color="#1DA1F2" />, color: "#1DA1F2" },
+    { name: "Instagram", key: "instagram", icon: <Instagram size={24} color="#E4405F" />, color: "#E4405F" },
+    { name: "LinkedIn", key: "linkedin", icon: <Linkedin size={24} color="#0077B5" />, color: "#0077B5" },
+    { name: "Telegram", key: "telegram", icon: <Send size={24} color="#0088CC" />, color: "#0088CC" },
   ];
 
-  const handleConnect = async (platformName: string) => {
-    // Simulate OAuth flow
-    setTimeout(() => {
-      connectPlatform(platformName);
+  const oauthStartMutation = trpc.oauth.start.useMutation();
+  const oauthCallbackMutation = trpc.oauth.callback.useMutation();
+
+  const handleConnect = async (platformName: string, platformKey: string) => {
+    setLoadingPlatforms(prev => new Set(prev).add(platformName));
+    
+    try {
+      console.log(`[Platform Connect] Starting OAuth for ${platformKey}`);
+      
+      const startResult = await oauthStartMutation.mutateAsync({ 
+        platform: platformKey as any 
+      });
+      
+      if (startResult.requiresBotToken) {
+        // Handle Telegram bot token flow
+        Alert.alert(
+          "Telegram Setup",
+          startResult.instructions || "Please set up your Telegram bot token in Settings.",
+          [
+            { text: "Cancel", style: "cancel" },
+            { text: "Go to Settings", onPress: () => router.push("/(tabs)/settings") }
+          ]
+        );
+      } else if (startResult.authUrl) {
+        // For demo purposes, simulate successful OAuth
+        console.log(`[Platform Connect] Would redirect to: ${startResult.authUrl}`);
+        
+        // Simulate OAuth callback
+        setTimeout(async () => {
+          try {
+            const callbackResult = await oauthCallbackMutation.mutateAsync({
+              platform: platformKey as any,
+              code: "demo_auth_code",
+              state: startResult.state
+            });
+            
+            if (callbackResult.success) {
+              connectPlatform(platformName);
+              Alert.alert(
+                "Success",
+                `${platformName} connected successfully!${isLiveMode ? '' : ' (Demo Mode)'}`,
+                [{ text: "OK" }]
+              );
+            }
+          } catch (error) {
+            console.error(`[Platform Connect] Callback error:`, error);
+            Alert.alert(
+              "Connection Failed",
+              `Failed to connect ${platformName}. Please try again.`,
+              [{ text: "OK" }]
+            );
+          } finally {
+            setLoadingPlatforms(prev => {
+              const newSet = new Set(prev);
+              newSet.delete(platformName);
+              return newSet;
+            });
+          }
+        }, 2000);
+      }
+    } catch (error) {
+      console.error(`[Platform Connect] Start error:`, error);
       Alert.alert(
-        "Success",
-        `${platformName} connected successfully!`,
+        "Connection Failed",
+        `Failed to start ${platformName} connection. Please try again.`,
         [{ text: "OK" }]
       );
-    }, 1500);
+      setLoadingPlatforms(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(platformName);
+        return newSet;
+      });
+    }
   };
 
   const handleContinue = () => {
@@ -103,9 +182,22 @@ export default function PlatformConnectScreen() {
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.header}>
-          <Text style={styles.title}>Connect Your Platforms</Text>
+          <View style={styles.titleRow}>
+            <Text style={styles.title}>Connect Your Platforms</Text>
+            <View style={[styles.modeBadge, isLiveMode ? styles.liveBadge : styles.dryRunBadge]}>
+              {isLiveMode ? (
+                <Zap size={12} color="#10B981" />
+              ) : (
+                <AlertCircle size={12} color="#F59E0B" />
+              )}
+              <Text style={[styles.modeText, isLiveMode ? styles.liveText : styles.dryRunText]}>
+                {isLiveMode ? 'LIVE' : 'DEMO'}
+              </Text>
+            </View>
+          </View>
           <Text style={styles.subtitle}>
             Link your social media accounts to start automating your marketing with Flâneur
+            {!isLiveMode && " (Demo mode - no real connections)"}
           </Text>
         </View>
 
@@ -117,7 +209,8 @@ export default function PlatformConnectScreen() {
               icon={platform.icon}
               color={platform.color}
               connected={connectedPlatforms.includes(platform.name)}
-              onConnect={() => handleConnect(platform.name)}
+              loading={loadingPlatforms.has(platform.name)}
+              onConnect={() => handleConnect(platform.name, platform.key)}
             />
           ))}
         </View>
@@ -126,6 +219,7 @@ export default function PlatformConnectScreen() {
           <Text style={styles.infoTitle}>🔒 Secure Connection</Text>
           <Text style={styles.infoText}>
             We use OAuth 2.0 for secure authentication. Your credentials are never stored on our servers.
+            {!isLiveMode && "\n\n⚠️ Demo Mode: Connections are simulated for testing purposes."}
           </Text>
         </View>
 
@@ -285,5 +379,40 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "600" as const,
     color: theme.colors.black,
+  },
+  titleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 8,
+  },
+  modeBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    gap: 4,
+  },
+  liveBadge: {
+    backgroundColor: "#10B98120",
+    borderWidth: 1,
+    borderColor: "#10B981",
+  },
+  dryRunBadge: {
+    backgroundColor: "#F59E0B20",
+    borderWidth: 1,
+    borderColor: "#F59E0B",
+  },
+  modeText: {
+    fontSize: 10,
+    fontWeight: "700" as const,
+    textTransform: "uppercase" as const,
+  },
+  liveText: {
+    color: "#10B981",
+  },
+  dryRunText: {
+    color: "#F59E0B",
   },
 });

@@ -41,7 +41,7 @@ function decrypt(encryptedText: string): string {
 }
 
 // Platform-specific OAuth implementations
-async function exchangeCodeForToken(platform: string, code: string): Promise<{
+async function exchangeCodeForToken(platform: string, code: string, codeVerifier?: string): Promise<{
   access_token: string;
   refresh_token?: string;
   expires_at?: string;
@@ -59,22 +59,37 @@ async function exchangeCodeForToken(platform: string, code: string): Promise<{
     facebook: 'https://graph.facebook.com/v18.0/oauth/access_token'
   };
   
+  // X (Twitter) uses PKCE
+  const requestBody: Record<string, string> = platform === 'x' && codeVerifier ? {
+    grant_type: 'authorization_code',
+    client_id: clientId,
+    code,
+    redirect_uri: redirectUri,
+    code_verifier: codeVerifier
+  } : {
+    grant_type: 'authorization_code',
+    client_id: clientId,
+    client_secret: clientSecret,
+    code,
+    redirect_uri: redirectUri
+  };
+  
   const response = await fetch(tokenUrls[platform], {
     method: 'POST',
     headers: {
       'Content-Type': 'application/x-www-form-urlencoded',
-      'Accept': 'application/json'
+      'Accept': 'application/json',
+      // X requires Basic auth for PKCE
+      ...(platform === 'x' ? {
+        'Authorization': `Basic ${Buffer.from(`${clientId}:${clientSecret}`).toString('base64')}`
+      } : {})
     },
-    body: new URLSearchParams({
-      grant_type: 'authorization_code',
-      client_id: clientId,
-      client_secret: clientSecret,
-      code,
-      redirect_uri: redirectUri
-    })
+    body: new URLSearchParams(requestBody)
   });
   
   if (!response.ok) {
+    const errorText = await response.text();
+    console.error(`[OAuth] Token exchange failed for ${platform}:`, errorText);
     throw new Error(`Token exchange failed: ${response.statusText}`);
   }
   
@@ -108,6 +123,8 @@ async function fetchUserProfile(platform: string, accessToken: string): Promise<
   });
   
   if (!response.ok) {
+    const errorText = await response.text();
+    console.error(`[OAuth] Profile fetch failed for ${platform}:`, errorText);
     throw new Error(`Profile fetch failed: ${response.statusText}`);
   }
   
@@ -194,24 +211,66 @@ async function refreshAccessToken(platform: string, refreshToken: string): Promi
 
 function getClientId(platform: string): string {
   const clientIds: Record<string, string> = {
-    x: process.env.X_CLIENT_ID!,
-    instagram: process.env.META_APP_ID!,
-    linkedin: process.env.LINKEDIN_CLIENT_ID!,
-    tiktok: process.env.TIKTOK_CLIENT_KEY!,
-    facebook: process.env.META_APP_ID!
+    x: process.env.X_CLIENT_ID || 'demo_x_client_id',
+    instagram: process.env.META_APP_ID || 'demo_meta_app_id',
+    linkedin: process.env.LINKEDIN_CLIENT_ID || 'demo_linkedin_client_id',
+    tiktok: process.env.TIKTOK_CLIENT_KEY || 'demo_tiktok_client_key',
+    facebook: process.env.META_APP_ID || 'demo_meta_app_id'
   };
   return clientIds[platform] || '';
 }
 
 function getClientSecret(platform: string): string {
   const clientSecrets: Record<string, string> = {
-    x: process.env.X_CLIENT_SECRET!,
-    instagram: process.env.META_APP_SECRET!,
-    linkedin: process.env.LINKEDIN_CLIENT_SECRET!,
-    tiktok: process.env.TIKTOK_CLIENT_SECRET!,
-    facebook: process.env.META_APP_SECRET!
+    x: process.env.X_CLIENT_SECRET || 'demo_x_client_secret',
+    instagram: process.env.META_APP_SECRET || 'demo_meta_app_secret',
+    linkedin: process.env.LINKEDIN_CLIENT_SECRET || 'demo_linkedin_client_secret',
+    tiktok: process.env.TIKTOK_CLIENT_SECRET || 'demo_tiktok_client_secret',
+    facebook: process.env.META_APP_SECRET || 'demo_meta_app_secret'
   };
   return clientSecrets[platform] || '';
+}
+
+// Telegram bot validation (will be used in future implementations)
+export async function validateTelegramBot(botToken: string): Promise<{
+  id: string;
+  username: string;
+  first_name: string;
+}> {
+  const response = await fetch(`https://api.telegram.org/bot${botToken}/getMe`);
+  
+  if (!response.ok) {
+    throw new Error('Invalid Telegram bot token');
+  }
+  
+  const data = await response.json();
+  
+  if (!data.ok) {
+    throw new Error('Telegram API error: ' + data.description);
+  }
+  
+  return data.result;
+}
+
+// Test Telegram channel access (will be used in future implementations)
+export async function testTelegramChannel(botToken: string, chatId: string): Promise<boolean> {
+  try {
+    const response = await fetch(`https://api.telegram.org/bot${botToken}/getChat`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        chat_id: chatId
+      })
+    });
+    
+    const data = await response.json();
+    return data.ok;
+  } catch (error) {
+    console.error('[OAuth] Telegram channel test failed:', error);
+    return false;
+  }
 }
 
 // Mock social accounts storage (in production, use database)
@@ -242,8 +301,15 @@ const oauthCallbackInputSchema = z.object({
   error: z.string().optional()
 });
 
+// Generate PKCE challenge for X OAuth 2.0
+function generatePKCEChallenge(): { codeVerifier: string; codeChallenge: string } {
+  const codeVerifier = crypto.randomBytes(32).toString('base64url');
+  const codeChallenge = crypto.createHash('sha256').update(codeVerifier).digest('base64url');
+  return { codeVerifier, codeChallenge };
+}
+
 // OAuth URL generation for all platforms
-const getOAuthUrl = (platform: string, state: string): string => {
+const getOAuthUrl = (platform: string, state: string): { authUrl: string; codeVerifier?: string } => {
   const baseUrls: Record<string, string> = {
     x: "https://twitter.com/i/oauth2/authorize",
     instagram: "https://api.instagram.com/oauth/authorize",
@@ -254,18 +320,18 @@ const getOAuthUrl = (platform: string, state: string): string => {
   };
   
   const clientIds: Record<string, string> = {
-    x: process.env.X_CLIENT_ID || "demo_client_id",
-    instagram: process.env.META_APP_ID || "demo_client_id",
-    linkedin: process.env.LINKEDIN_CLIENT_ID || "demo_client_id",
-    tiktok: process.env.TIKTOK_CLIENT_KEY || "demo_client_id",
-    facebook: process.env.META_APP_ID || "demo_client_id",
+    x: getClientId('x'),
+    instagram: getClientId('instagram'),
+    linkedin: getClientId('linkedin'),
+    tiktok: getClientId('tiktok'),
+    facebook: getClientId('facebook'),
     telegram: ""
   };
   
   const redirectUri = `${process.env.BASE_URL || 'http://localhost:3000'}/api/oauth/${platform}/callback`;
   
   if (platform === "telegram") {
-    return "";
+    return { authUrl: "" };
   }
   
   const scopes: Record<string, string> = {
@@ -276,7 +342,15 @@ const getOAuthUrl = (platform: string, state: string): string => {
     facebook: "pages_manage_posts,pages_read_engagement,pages_read_user_content"
   };
   
-  return `${baseUrls[platform]}?client_id=${clientIds[platform]}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${encodeURIComponent(scopes[platform])}&response_type=code&state=${state}`;
+  // X uses PKCE
+  if (platform === 'x') {
+    const { codeVerifier, codeChallenge } = generatePKCEChallenge();
+    const authUrl = `${baseUrls[platform]}?client_id=${clientIds[platform]}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${encodeURIComponent(scopes[platform])}&response_type=code&state=${state}&code_challenge=${codeChallenge}&code_challenge_method=S256`;
+    return { authUrl, codeVerifier };
+  }
+  
+  const authUrl = `${baseUrls[platform]}?client_id=${clientIds[platform]}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${encodeURIComponent(scopes[platform])}&response_type=code&state=${state}`;
+  return { authUrl };
 };
 
 export const oauthStartProcedure = publicProcedure
@@ -297,17 +371,24 @@ export const oauthStartProcedure = publicProcedure
       }
       
       const state = Math.random().toString(36).substring(2, 15);
-      const authUrl = getOAuthUrl(input.platform, state);
+      const { authUrl, codeVerifier } = getOAuthUrl(input.platform, state);
       
       if (!isLiveMode) {
         console.log(`[OAuth] DRY_RUN mode - would redirect to: ${authUrl}`);
+      }
+      
+      // Store code verifier for X PKCE flow (in production, use Redis/database)
+      if (codeVerifier) {
+        // In a real app, store this securely with the state
+        console.log(`[OAuth] Generated PKCE code verifier for state: ${state}`);
       }
       
       return {
         requiresBotToken: false,
         authUrl,
         message: `Redirecting to ${input.platform} for authorization`,
-        state
+        state,
+        ...(codeVerifier ? { codeVerifier } : {})
       };
     } catch (error) {
       console.error(`[OAuth] Start error:`, error);
@@ -546,7 +627,7 @@ export const oauthFixProcedure = publicProcedure
     // This is essentially the same as starting a new OAuth flow
     // but for an existing expired connection
     const state = Math.random().toString(36).substring(2, 15);
-    const authUrl = getOAuthUrl(input.platform, state);
+    const { authUrl } = getOAuthUrl(input.platform, state);
     
     return {
       requiresBotToken: input.platform === "telegram",

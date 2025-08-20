@@ -206,7 +206,9 @@ export const contentListProcedure = publicProcedure
   .query(async ({ input }) => {
     console.log("[Content] Fetching content list with filters:", input);
 
-    let filtered = [...mockContent];
+    // Ensure mockContent is always an array
+    const safeContent = Array.isArray(mockContent) ? mockContent : [];
+    let filtered = [...safeContent];
     
     if (input.status) {
       filtered = filtered.filter(item => item.status === input.status);
@@ -224,14 +226,15 @@ export const contentListProcedure = publicProcedure
     
     // Get queue statistics
     const queueStatus = {
-      draft: mockContent.filter(i => i.status === 'draft').length,
-      queued: mockContent.filter(i => i.status === 'queued').length,
-      published: mockContent.filter(i => i.status === 'published').length,
-      held: mockContent.filter(i => i.status === 'held').length,
-      error: mockContent.filter(i => i.status === 'error').length
+      draft: safeContent.filter(i => i.status === 'draft').length,
+      queued: safeContent.filter(i => i.status === 'queued').length,
+      published: safeContent.filter(i => i.status === 'published').length,
+      held: safeContent.filter(i => i.status === 'held').length,
+      error: safeContent.filter(i => i.status === 'error').length
     };
     
-    return {
+    // Always return a valid response structure - never undefined
+    const response = {
       items: items.map(item => ({
         ...item,
         createdAt: item.createdAt.toISOString(),
@@ -254,6 +257,9 @@ export const contentListProcedure = publicProcedure
         isActive: isWithinPublishingWindow()
       }
     };
+    
+    console.log('[Content] Returning content list response:', { itemCount: response.items.length, total: response.total });
+    return response;
   });
 
 export const contentQueueProcedure = publicProcedure

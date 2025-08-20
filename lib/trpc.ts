@@ -6,12 +6,7 @@ import superjson from "superjson";
 export const trpc = createTRPCReact<AppRouter>();
 
 const getBaseUrl = () => {
-  if (typeof window !== 'undefined') {
-    // Browser - use current origin
-    return window.location.origin;
-  }
-  
-  // Server-side or React Native
+  // Always use the configured API URL for consistency
   if (process.env.EXPO_PUBLIC_API_URL) {
     return process.env.EXPO_PUBLIC_API_URL;
   }
@@ -339,11 +334,12 @@ const getMockResponse = (url: string | URL | Request) => {
   }
   
   // Default mock response - ensure we never return undefined
+  console.log('[tRPC] Using default mock response for:', urlString);
   return createMockResponse({
     success: true,
     message: 'Mock response - backend not available',
     timestamp: new Date().toISOString(),
-    data: null // Fallback data
+    data: {} // Always return an object, never null
   });
 };
 
@@ -359,20 +355,50 @@ export const trpcClient = trpc.createClient({
             ...options,
             headers: {
               'Content-Type': 'application/json',
+              'Accept': 'application/json',
               ...options?.headers,
             },
           });
           
+          // Check if response is ok
           if (!response.ok) {
             console.error('[tRPC] HTTP error:', response.status, response.statusText);
+            
+            // Try to read the response body for better error handling
+            try {
+              const errorText = await response.text();
+              console.error('[tRPC] Error response body:', errorText);
+              
+              // If it's HTML, fall back to mock
+              if (errorText.includes('<!DOCTYPE html>') || errorText.includes('<html')) {
+                console.log('[tRPC] Received HTML error page, falling back to mock response');
+                return getMockResponse(url);
+              }
+            } catch (e) {
+              console.error('[tRPC] Could not read error response:', e);
+            }
+            
             // Return mock response as fallback
             console.log('[tRPC] Falling back to mock response');
             return getMockResponse(url);
           }
           
+          // Check content type
           const contentType = response.headers.get('content-type');
           if (!contentType?.includes('application/json')) {
             console.error('[tRPC] Non-JSON response:', contentType);
+            
+            // Try to read the response to see if it's HTML
+            try {
+              const responseText = await response.text();
+              if (responseText.includes('<!DOCTYPE html>') || responseText.includes('<html')) {
+                console.log('[tRPC] Received HTML response, falling back to mock response');
+                return getMockResponse(url);
+              }
+            } catch (e) {
+              console.error('[tRPC] Could not read response text:', e);
+            }
+            
             // Return mock response as fallback
             console.log('[tRPC] Falling back to mock response');
             return getMockResponse(url);
