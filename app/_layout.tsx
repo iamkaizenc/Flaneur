@@ -11,7 +11,23 @@ import { trpc, trpcClient } from "@/lib/trpc";
 
 SplashScreen.preventAutoHideAsync();
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      retry: (failureCount, error) => {
+        // Don't retry if it's a tRPC error
+        if (error?.message?.includes('tRPC')) {
+          return false;
+        }
+        return failureCount < 2;
+      },
+      staleTime: 1000 * 60 * 5, // 5 minutes
+      refetchOnWindowFocus: false,
+      // Ensure queries never return undefined
+      placeholderData: (previousData: any) => previousData,
+    },
+  },
+});
 
 function RootLayoutNav() {
   return (

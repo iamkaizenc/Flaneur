@@ -108,6 +108,7 @@ export const settingsGetProcedure = publicProcedure
   .query(async () => {
     console.log("[Settings] Fetching workspace settings");
     
+    // Always return settings data to prevent undefined errors
     return {
       success: true,
       ...mockSettings

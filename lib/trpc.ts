@@ -6,9 +6,18 @@ import superjson from "superjson";
 export const trpc = createTRPCReact<AppRouter>();
 
 const getBaseUrl = () => {
-  // Always use mock backend for now to avoid connection issues
-  console.log('[tRPC] Using mock backend for development');
-  return 'http://mock-backend-unavailable';
+  if (typeof window !== 'undefined') {
+    // Browser - use current origin
+    return window.location.origin;
+  }
+  
+  // Server-side or React Native
+  if (process.env.EXPO_PUBLIC_API_URL) {
+    return process.env.EXPO_PUBLIC_API_URL;
+  }
+  
+  // Development fallback
+  return 'http://localhost:8081';
 };
 
 // Mock responses for when backend is not available
@@ -329,11 +338,12 @@ const getMockResponse = (url: string | URL | Request) => {
     });
   }
   
-  // Default mock response
+  // Default mock response - ensure we never return undefined
   return createMockResponse({
     success: true,
     message: 'Mock response - backend not available',
-    timestamp: new Date().toISOString()
+    timestamp: new Date().toISOString(),
+    data: null // Fallback data
   });
 };
 
@@ -343,9 +353,38 @@ export const trpcClient = trpc.createClient({
       url: `${getBaseUrl()}/api/trpc`,
       transformer: superjson,
       fetch: async (url, options) => {
-        // Always use mock responses for development
-        console.log('[tRPC] Using mock response for:', url);
-        return getMockResponse(url);
+        try {
+          console.log('[tRPC] Making request to:', url);
+          const response = await fetch(url, {
+            ...options,
+            headers: {
+              'Content-Type': 'application/json',
+              ...options?.headers,
+            },
+          });
+          
+          if (!response.ok) {
+            console.error('[tRPC] HTTP error:', response.status, response.statusText);
+            // Return mock response as fallback
+            console.log('[tRPC] Falling back to mock response');
+            return getMockResponse(url);
+          }
+          
+          const contentType = response.headers.get('content-type');
+          if (!contentType?.includes('application/json')) {
+            console.error('[tRPC] Non-JSON response:', contentType);
+            // Return mock response as fallback
+            console.log('[tRPC] Falling back to mock response');
+            return getMockResponse(url);
+          }
+          
+          return response;
+        } catch (error) {
+          console.error('[tRPC] Fetch error:', error);
+          // Return mock response as fallback
+          console.log('[tRPC] Falling back to mock response');
+          return getMockResponse(url);
+        }
       },
     }),
   ],

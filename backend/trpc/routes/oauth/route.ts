@@ -521,6 +521,7 @@ export const oauthListAccountsProcedure = publicProcedure
     
     const userAccounts = socialAccounts.filter(acc => acc.userId === userId);
     
+    // Always return accounts array, even if empty
     return {
       accounts: userAccounts.map(acc => ({
         id: acc.id,

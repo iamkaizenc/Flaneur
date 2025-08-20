@@ -31,7 +31,12 @@ app.use("*", cors({
 // Add error handling middleware
 app.onError((err, c) => {
   console.error('[Hono] Server error:', err);
-  return c.json({ error: 'Internal server error', message: err.message }, 500);
+  return c.json({ 
+    error: { 
+      code: 'INTERNAL_SERVER_ERROR',
+      message: err.message || 'Internal server error'
+    }
+  }, 500);
 });
 
 // Health check endpoint
@@ -62,6 +67,13 @@ app.use(
     onError: ({ error, path }) => {
       console.error(`[tRPC] Error on ${path}:`, error);
     },
+    responseMeta: () => {
+      return {
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      };
+    },
   })
 );
 
@@ -78,9 +90,15 @@ app.get("/", (c) => {
   });
 });
 
-// Catch-all for unmatched routes
+// Catch-all for unmatched routes - always return JSON
 app.notFound((c) => {
-  return c.json({ error: 'Not Found', path: c.req.path }, 404);
+  return c.json({ 
+    error: { 
+      code: 'NOT_FOUND',
+      message: `Route not found: ${c.req.path}`,
+      path: c.req.path 
+    }
+  }, 404);
 });
 
 export default app;
