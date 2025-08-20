@@ -37,10 +37,14 @@ app.onError((err, c) => {
     error: {
       code: 'INTERNAL_SERVER_ERROR',
       message: err.message || 'Internal server error',
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
+      path: c.req.path,
+      method: c.req.method
     }
   };
   
+  // Set proper headers to ensure JSON response
+  c.header('Content-Type', 'application/json');
   return c.json(errorResponse, 500);
 });
 
@@ -76,6 +80,9 @@ app.use(
       return {
         headers: {
           'Content-Type': 'application/json',
+          'Access-Control-Allow-Origin': '*',
+          'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+          'Access-Control-Allow-Headers': 'Content-Type, Authorization',
         },
       };
     },

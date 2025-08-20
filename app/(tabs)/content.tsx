@@ -111,6 +111,25 @@ export default function ContentScreen() {
     status: selectedFilter === "all" ? undefined : selectedFilter,
   });
   
+  // Test query to verify tRPC is working
+  const testQuery = trpc.example.hi.useQuery({ name: "Test" });
+  
+  // Debug logging
+  console.log('[Content] Query status:', {
+    isLoading: contentQuery.isLoading,
+    isError: contentQuery.isError,
+    error: contentQuery.error?.message,
+    data: contentQuery.data ? 'present' : 'undefined',
+    itemsCount: contentQuery.data?.items?.length || 0
+  });
+  
+  console.log('[Content] Test query status:', {
+    isLoading: testQuery.isLoading,
+    isError: testQuery.isError,
+    error: testQuery.error?.message,
+    data: testQuery.data
+  });
+  
   const contentItems = contentQuery.data?.items || [];
 
   const filters: Array<{ label: string; value: ContentStatus | "all"; count: number }> = [
