@@ -1159,14 +1159,14 @@ export default function SettingsScreen() {
             subtitle="Add a test job to the scheduler"
             onPress={async () => {
               try {
-                const runAt = new Date(Date.now() + 60000); // 1 minute from now
+                const runAtDate = new Date(Date.now() + 60000); // 1 minute from now
                 const result = await trpcClient.scheduler.queue.mutate({
                   contentId: `demo_content_${Date.now()}`,
-                  runAt: runAt.toISOString()
+                  runAt: runAtDate.toISOString()
                 });
                 Alert.alert(
                   "Job Queued",
-                  `Job ${result.jobId} scheduled for ${runAt.toLocaleTimeString()}`
+                  `Job ${result.jobId} scheduled for ${runAtDate.toLocaleTimeString()}`
                 );
               } catch (error) {
                 Alert.alert("Error", "Failed to queue job");
