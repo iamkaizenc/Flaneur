@@ -851,9 +851,23 @@ export default function SettingsScreen() {
           />
         </View>
 
-        {/* Subscription Section */}
-        <SectionHeader title="Subscription" icon={<CreditCard size={20} color={theme.colors.white} />} />
+        {/* Billing & Subscription Section */}
+        <SectionHeader title="Billing & Subscription" icon={<CreditCard size={20} color={theme.colors.white} />} />
         <View style={styles.section}>
+          <SettingItem
+            title="Manage Billing"
+            subtitle="View plans, usage, and billing details"
+            onPress={() => {
+              // Navigate to billing settings page
+              Alert.alert(
+                "Billing Management",
+                "This would open the full billing management interface with plan details, usage stats, and Stripe integration.",
+                [{ text: "OK" }]
+              );
+            }}
+            rightElement={<CreditCard size={16} color={theme.colors.gray[400]} />}
+          />
+          
           <View style={styles.currentPlanCard}>
             <View style={styles.currentPlanHeader}>
               <View style={styles.currentPlanInfo}>

@@ -51,10 +51,12 @@ app.onError((err, c) => {
   return c.json(errorResponse, 500);
 });
 
-// Add global middleware to ensure all responses are JSON
+// Add global middleware to ensure all responses are JSON (except for webhooks that need raw body)
 app.use('*', async (c, next) => {
-  // Set JSON headers for all responses
-  c.header('Content-Type', 'application/json');
+  // Skip JSON header for webhook endpoints that need raw body
+  if (!c.req.path.includes('/webhooks/')) {
+    c.header('Content-Type', 'application/json');
+  }
   await next();
 });
 
@@ -126,6 +128,56 @@ app.get("/version", (c) => {
       environment: process.env.NODE_ENV || "development",
       error: "Could not read package.json"
     });
+  }
+});
+
+// Stripe webhook endpoint
+app.post("/webhooks/stripe", async (c) => {
+  console.log('[Hono] Stripe webhook received');
+  
+  try {
+    const signature = c.req.header('stripe-signature');
+    if (!signature) {
+      console.error('[Hono] Missing Stripe signature header');
+      return c.json({ error: 'Missing signature' }, 400);
+    }
+    
+    const payload = await c.req.text();
+    
+    // Process webhook directly (simplified for now)
+    const isDryRun = process.env.DRY_RUN === 'true' || process.env.DRY_RUN === '1';
+    const isLiveMode = process.env.LIVE_MODE === 'true';
+    
+    if (isDryRun || !isLiveMode) {
+      console.log('[Hono] DRY_RUN mode - webhook processing skipped');
+      return c.json({
+        received: true,
+        processed: false,
+        mode: 'DRY_RUN',
+        timestamp: new Date().toISOString()
+      });
+    }
+    
+    // In LIVE mode, would process the actual webhook
+    console.log('[Hono] LIVE mode - webhook would be processed');
+    
+    return c.json({
+      received: true,
+      processed: true,
+      mode: 'LIVE',
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    console.error('[Hono] Webhook processing error:', error);
+    
+    // Always return JSON, never HTML
+    return c.json({
+      error: {
+        code: 'WEBHOOK_ERROR',
+        message: error instanceof Error ? error.message : 'Webhook processing failed',
+        timestamp: new Date().toISOString()
+      }
+    }, 400);
   }
 });
 

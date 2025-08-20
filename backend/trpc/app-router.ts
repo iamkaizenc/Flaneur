@@ -60,6 +60,15 @@ import {
   getJobStatsProcedure,
   workerTickProcedure
 } from "./routes/scheduler/route";
+import {
+  createCheckoutProcedure,
+  getPortalProcedure,
+  getCurrentPlanProcedure,
+  listPlansProcedure,
+  webhookProcedure,
+  checkFeatureAccessProcedure,
+  getUsageStatsProcedure
+} from "./routes/billing/route";
 
 export const appRouter = createTRPCRouter({
   example: createTRPCRouter({
@@ -215,6 +224,15 @@ export const appRouter = createTRPCRouter({
     list: listJobsProcedure,
     stats: getJobStatsProcedure,
     workerTick: workerTickProcedure,
+  }),
+  billing: createTRPCRouter({
+    createCheckout: createCheckoutProcedure,
+    portal: getPortalProcedure,
+    getCurrent: getCurrentPlanProcedure,
+    list: listPlansProcedure,
+    webhook: webhookProcedure,
+    checkFeatureAccess: checkFeatureAccessProcedure,
+    usage: getUsageStatsProcedure,
   }),
   ops: createTRPCRouter({
     health: publicProcedure.query(async () => {

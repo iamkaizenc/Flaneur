@@ -365,6 +365,104 @@ export const mockFallbacks = {
   'example.hi': {
     message: 'Hello from tRPC! Server is working properly.',
     timestamp: new Date().toISOString()
+  },
+  'billing.getCurrent': {
+    success: true,
+    plan: 'free' as const,
+    name: 'Free',
+    description: 'Basic features for getting started',
+    price: 0,
+    features: {
+      analytics: false,
+      automation: false,
+      maxAccounts: 1,
+      dailyPosts: 5,
+      aiAgent: false,
+      prioritySupport: false
+    },
+    billingCycle: 'monthly' as const,
+    status: 'active' as const,
+    current_period_end: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+    cancelAtPeriodEnd: false,
+    stripeCustomerId: null,
+    stripeSubscriptionId: null
+  },
+  'billing.list': {
+    success: true,
+    plans: [
+      {
+        id: 'free',
+        name: 'Free',
+        description: 'Basic features for getting started',
+        price: 0,
+        features: {
+          analytics: false,
+          automation: false,
+          maxAccounts: 1,
+          dailyPosts: 5,
+          aiAgent: false,
+          prioritySupport: false
+        },
+        popular: false
+      },
+      {
+        id: 'premium',
+        name: 'Premium',
+        description: 'Advanced features for growing creators',
+        price: 29,
+        priceYearly: 290,
+        features: {
+          analytics: true,
+          automation: true,
+          maxAccounts: 3,
+          dailyPosts: 25,
+          aiAgent: true,
+          prioritySupport: false
+        },
+        popular: true
+      },
+      {
+        id: 'platinum',
+        name: 'Platinum',
+        description: 'Everything you need for professional growth',
+        price: 99,
+        priceYearly: 990,
+        features: {
+          analytics: true,
+          automation: true,
+          maxAccounts: 10,
+          dailyPosts: 100,
+          aiAgent: true,
+          prioritySupport: true
+        },
+        popular: false
+      }
+    ]
+  },
+  'billing.usage': {
+    success: true,
+    usage: {
+      accounts: {
+        used: 1,
+        limit: 1,
+        percentage: 100
+      },
+      dailyPosts: {
+        used: 3,
+        limit: 5,
+        percentage: 60
+      },
+      resetDate: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
+    },
+    plan: 'free' as const,
+    billingPeriod: 'm' as const
+  },
+  'billing.checkFeatureAccess': {
+    success: true,
+    hasAccess: false,
+    plan: 'free' as const,
+    feature: 'analytics' as const,
+    requiresUpgrade: true
   }
 };
 
