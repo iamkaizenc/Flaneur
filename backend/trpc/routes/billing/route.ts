@@ -3,9 +3,7 @@ import { publicProcedure, protectedProcedure } from "../../create-context";
 import Stripe from "stripe";
 
 // Initialize Stripe
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || 'sk_test_demo_key', {
-  apiVersion: '2025-07-30.basil'
-});
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || 'sk_test_demo_key');
 
 // Plan configuration
 const PLANS = {
