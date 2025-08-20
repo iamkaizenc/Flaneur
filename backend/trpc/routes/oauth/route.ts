@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { publicProcedure } from "../../create-context";
+import { publicProcedure, protectedProcedure } from "../../create-context";
 import crypto from "crypto";
 // Error classes
 class AuthError extends Error {
@@ -18,6 +18,83 @@ class ValidationError extends Error {
 
 // Encryption utilities
 const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY || 'default_32_char_key_for_dev_only!';
+
+// Domain allowlist for security
+const ALLOWED_DOMAINS = [
+  process.env.PRIMARY_DOMAIN || 'localhost:3000',
+  'flaneurcollective.com',
+  'app.flaneurcollective.com'
+];
+
+// Rate limiting storage (in production, use Redis)
+const rateLimitStore = new Map<string, { count: number; resetTime: number; platform?: string; nonce?: string; userId?: string }>();
+
+// Rate limit check
+function checkRateLimit(key: string, limit: number, windowMs: number): boolean {
+  const now = Date.now();
+  const record = rateLimitStore.get(key);
+  
+  if (!record || now > record.resetTime) {
+    rateLimitStore.set(key, { count: 1, resetTime: now + windowMs });
+    return true;
+  }
+  
+  if (record.count >= limit) {
+    return false;
+  }
+  
+  record.count++;
+  return true;
+}
+
+// Validate domain origin
+function validateOrigin(origin?: string): boolean {
+  if (!origin) return false;
+  
+  try {
+    const url = new URL(origin);
+    return ALLOWED_DOMAINS.some(domain => {
+      return url.hostname === domain || url.hostname.endsWith('.' + domain);
+    });
+  } catch {
+    return false;
+  }
+}
+
+// HMAC signature validation
+function validateHMACSignature(payload: string, signature: string, secret: string): boolean {
+  const expectedSignature = crypto.createHmac('sha256', secret)
+    .update(payload)
+    .digest('hex');
+  
+  return crypto.timingSafeEqual(
+    Buffer.from(signature, 'hex'),
+    Buffer.from(expectedSignature, 'hex')
+  );
+}
+
+// Secret redaction for logs
+function redactSecrets(obj: any): any {
+  const redactKeys = /(token|secret|key|bearer|authorization|password)/i;
+  
+  if (typeof obj === 'string') {
+    return redactKeys.test(obj) ? '****' : obj;
+  }
+  
+  if (Array.isArray(obj)) {
+    return obj.map(redactSecrets);
+  }
+  
+  if (obj && typeof obj === 'object') {
+    const redacted: any = {};
+    for (const [key, value] of Object.entries(obj)) {
+      redacted[key] = redactKeys.test(key) ? '****' : redactSecrets(value);
+    }
+    return redacted;
+  }
+  
+  return obj;
+}
 
 function encrypt(text: string): string {
   const iv = crypto.randomBytes(16);
@@ -353,9 +430,28 @@ const getOAuthUrl = (platform: string, state: string): { authUrl: string; codeVe
   return { authUrl };
 };
 
-export const oauthStartProcedure = publicProcedure
+export const oauthStartProcedure = protectedProcedure
   .input(oauthStartInputSchema)
-  .mutation(async ({ input }) => {
+  .mutation(async ({ input, ctx }) => {
+    // Rate limiting: 20 requests per minute per IP
+    const clientIP = (ctx.req.headers.get?.('x-forwarded-for') || 
+                     ctx.req.headers.get?.('x-real-ip') || 
+                     'unknown') as string;
+    const rateLimitKey = `oauth_start_${clientIP}`;
+    
+    if (!checkRateLimit(rateLimitKey, 20, 60000)) {
+      throw new Error('Rate limit exceeded. Please try again later.');
+    }
+    
+    // Origin validation in LIVE mode
+    const isLiveMode = process.env.LIVE_MODE === 'true';
+    if (isLiveMode) {
+      const origin = ctx.req.headers.get?.('origin') || undefined;
+      if (!validateOrigin(origin)) {
+        console.error('[OAuth] Invalid origin:', redactSecrets({ origin }));
+        throw new Error('Invalid origin');
+      }
+    }
     try {
       console.log(`[OAuth] Starting OAuth flow for ${input.platform}`);
       

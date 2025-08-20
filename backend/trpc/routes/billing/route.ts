@@ -3,7 +3,9 @@ import { publicProcedure, protectedProcedure } from "../../create-context";
 import Stripe from "stripe";
 
 // Initialize Stripe
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || 'sk_test_demo_key');
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || 'sk_test_demo_key', {
+  apiVersion: '2025-07-30.basil'
+});
 
 // Plan configuration
 const PLANS = {
@@ -291,7 +293,7 @@ export const webhookProcedure = publicProcedure
           console.log('[Billing] Subscription updated:', subscription.id);
           
           mockPlanState.status = subscription.status === 'active' ? 'active' : 'canceled';
-          // Type assertion to access current_period_end
+          // Type assertion for current_period_end
           const sub = subscription as any;
           if (sub.current_period_end) {
             mockPlanState.current_period_end = new Date(sub.current_period_end * 1000).toISOString();
