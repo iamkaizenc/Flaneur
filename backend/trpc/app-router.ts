@@ -1,4 +1,4 @@
-import { createTRPCRouter } from "./create-context";
+import { createTRPCRouter, publicProcedure } from "./create-context";
 import hiRoute from "./routes/example/hi/route";
 import { 
   oauthStartProcedure, 
@@ -216,6 +216,47 @@ export const appRouter = createTRPCRouter({
     stats: getJobStatsProcedure,
     workerTick: workerTickProcedure,
   }),
+  ops: createTRPCRouter({
+    health: publicProcedure.query(async () => {
+      return {
+        status: "ok",
+        timestamp: new Date().toISOString(),
+        service: "Flâneur tRPC API",
+        version: "1.0.0",
+        environment: process.env.NODE_ENV || "development",
+        dryRun: process.env.DRY_RUN === "true" || process.env.DRY_RUN === "1"
+      };
+    }),
+    ready: publicProcedure.query(async () => {
+      const checks = {
+        trpc: true,
+        timestamp: new Date().toISOString(),
+        environment: process.env.NODE_ENV || "development",
+        dryRun: process.env.DRY_RUN === "true" || process.env.DRY_RUN === "1",
+        procedures: true
+      };
+      
+      const allHealthy = Object.values(checks).every(check => check === true || typeof check === 'string');
+      
+      return {
+        status: allHealthy ? "ready" : "not_ready",
+        checks,
+        overall: allHealthy
+      };
+    }),
+    metrics: publicProcedure.query(async () => {
+      return {
+        timestamp: new Date().toISOString(),
+        version: "1.0.0",
+        environment: process.env.NODE_ENV || "development",
+        trpc: {
+          status: "operational",
+          totalRouters: 20, // Static count for now
+          totalProcedures: 100 // Static count for now
+        }
+      };
+    })
+  })
 });
 
 export type AppRouter = typeof appRouter;

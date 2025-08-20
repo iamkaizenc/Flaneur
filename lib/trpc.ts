@@ -390,6 +390,8 @@ const getBaseUrl = () => {
 
 
 
+
+
 export const trpcClient = trpc.createClient({
   links: [
     httpLink({
@@ -404,6 +406,7 @@ export const trpcClient = trpc.createClient({
             headers: {
               'Content-Type': 'application/json',
               'Accept': 'application/json',
+              'x-trpc-source': 'react-native',
               ...options?.headers,
             },
           });
@@ -423,14 +426,21 @@ export const trpcClient = trpc.createClient({
               console.error('[tRPC] 3. CORS issues or wrong port');
               console.error('[tRPC] 4. Request is being intercepted by a proxy or tunnel');
               
-              // Return a mock response structure to prevent crashes
-              const mockResponse = new Response(
-                JSON.stringify({
-                  error: {
+              // Return a structured tRPC error response
+              const errorResponse = {
+                error: {
+                  message: 'Server returned HTML instead of JSON',
+                  code: -32603, // tRPC internal error code
+                  data: {
                     code: 'NETWORK_ERROR',
-                    message: 'tRPC server not available - using fallback data'
+                    httpStatus: response.status,
+                    path: url
                   }
-                }),
+                }
+              };
+              
+              const mockResponse = new Response(
+                JSON.stringify(errorResponse),
                 {
                   status: 503,
                   headers: { 'Content-Type': 'application/json' }
@@ -442,9 +452,45 @@ export const trpcClient = trpc.createClient({
             // Try to parse as JSON error
             try {
               const errorData = JSON.parse(responseText);
-              throw new Error(errorData.error?.message || `HTTP ${response.status}`);
+              // Re-throw with proper structure
+              const structuredError = new Response(
+                JSON.stringify({
+                  error: {
+                    message: errorData.error?.message || `HTTP ${response.status}`,
+                    code: -32603,
+                    data: {
+                      code: errorData.error?.code || 'HTTP_ERROR',
+                      httpStatus: response.status
+                    }
+                  }
+                }),
+                {
+                  status: response.status,
+                  headers: { 'Content-Type': 'application/json' }
+                }
+              );
+              return structuredError;
             } catch {
-              throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+              // Return structured error for non-JSON responses
+              const errorResponse = {
+                error: {
+                  message: `HTTP ${response.status}: ${response.statusText}`,
+                  code: -32603,
+                  data: {
+                    code: 'HTTP_ERROR',
+                    httpStatus: response.status
+                  }
+                }
+              };
+              
+              const mockResponse = new Response(
+                JSON.stringify(errorResponse),
+                {
+                  status: response.status,
+                  headers: { 'Content-Type': 'application/json' }
+                }
+              );
+              return mockResponse;
             }
           }
           
@@ -457,14 +503,20 @@ export const trpcClient = trpc.createClient({
             console.error('[tRPC] Network error - make sure the development server is running');
             console.warn('[tRPC] Using fallback error response');
             
-            // Return a mock error response to prevent crashes
-            const mockResponse = new Response(
-              JSON.stringify({
-                error: {
+            // Return a structured tRPC error response
+            const errorResponse = {
+              error: {
+                message: 'Cannot connect to API server',
+                code: -32603,
+                data: {
                   code: 'NETWORK_ERROR',
-                  message: 'Cannot connect to API server'
+                  httpStatus: 503
                 }
-              }),
+              }
+            };
+            
+            const mockResponse = new Response(
+              JSON.stringify(errorResponse),
               {
                 status: 503,
                 headers: { 'Content-Type': 'application/json' }

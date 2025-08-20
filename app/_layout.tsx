@@ -48,6 +48,23 @@ const queryClient = new QueryClient({
         return null; // Let individual components handle null gracefully
       },
     },
+    mutations: {
+      retry: (failureCount, error: any) => {
+        // Don't retry mutations on network errors
+        if (error?.message?.includes('Failed to fetch') ||
+            error?.data?.code === 'NETWORK_ERROR') {
+          return false;
+        }
+        return failureCount < 1;
+      },
+      onError: (error: any) => {
+        console.error('[React Query] Mutation error:', {
+          message: error?.message,
+          code: error?.data?.code,
+          httpStatus: error?.data?.httpStatus
+        });
+      },
+    },
   },
 });
 
@@ -71,6 +88,27 @@ function RootLayoutNav() {
 export default function RootLayout() {
   useEffect(() => {
     SplashScreen.hideAsync();
+  }, []);
+
+  // Test tRPC connection on app start
+  useEffect(() => {
+    const testConnection = async () => {
+      try {
+        console.log('[App] Testing tRPC connection...');
+        const response = await fetch('/api/health');
+        if (response.ok) {
+          const data = await response.json();
+          console.log('[App] API health check passed:', data);
+        } else {
+          console.warn('[App] API health check failed:', response.status);
+        }
+      } catch (error) {
+        console.warn('[App] API connection test failed:', error);
+        console.log('[App] App will use fallback data for offline functionality');
+      }
+    };
+    
+    testConnection();
   }, []);
 
   return (
