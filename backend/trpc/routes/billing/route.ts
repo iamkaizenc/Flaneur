@@ -4,7 +4,7 @@ import Stripe from "stripe";
 
 // Initialize Stripe
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || 'sk_test_demo_key', {
-  apiVersion: '2024-12-18.acacia',
+  apiVersion: '2025-07-30.basil',
 });
 
 // Plan configuration
@@ -105,9 +105,9 @@ export const createCheckoutProcedure = protectedProcedure
       let customerId = mockPlanState.stripeCustomerId;
       if (!customerId) {
         const customer = await stripe.customers.create({
-          email: ctx.user?.email || 'demo@flaneur.app',
+          email: 'demo@flaneur.app',
           metadata: {
-            userId: ctx.user?.id || 'demo-user',
+            userId: 'demo-user',
             plan: input.plan,
             period: input.period
           }
@@ -130,7 +130,7 @@ export const createCheckoutProcedure = protectedProcedure
         success_url: input.successUrl || `${process.env.BASE_URL}/settings?checkout=success`,
         cancel_url: input.cancelUrl || `${process.env.BASE_URL}/settings?checkout=canceled`,
         metadata: {
-          userId: ctx.user?.id || 'demo-user',
+          userId: 'demo-user',
           plan: input.plan,
           period: input.period
         }
@@ -293,7 +293,11 @@ export const webhookProcedure = publicProcedure
           console.log('[Billing] Subscription updated:', subscription.id);
           
           mockPlanState.status = subscription.status === 'active' ? 'active' : 'canceled';
-          mockPlanState.current_period_end = new Date(subscription.current_period_end * 1000).toISOString();
+          // Type assertion to access current_period_end
+          const sub = subscription as any;
+          if (sub.current_period_end) {
+            mockPlanState.current_period_end = new Date(sub.current_period_end * 1000).toISOString();
+          }
           break;
         }
         

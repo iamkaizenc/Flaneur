@@ -668,7 +668,7 @@ export default function SettingsScreen() {
 
     try {
       await authUpdateProfileMutation.mutateAsync({ displayName: profileForm.displayName });
-      if (profileForm.email !== authMeQuery.data?.user?.email) {
+      if (profileForm.email !== authMeQuery.data?.email) {
         await authUpdateEmailMutation.mutateAsync({ 
           newEmail: profileForm.email, 
           password: "current_password" // In real app, ask for password
@@ -761,8 +761,8 @@ export default function SettingsScreen() {
 
   const openProfileModal = () => {
     setProfileForm({
-      displayName: authMeQuery.data?.user?.displayName || "",
-      email: authMeQuery.data?.user?.email || "",
+      displayName: authMeQuery.data?.displayName || "",
+      email: authMeQuery.data?.email || "",
     });
     setShowProfileModal(true);
   };
@@ -805,8 +805,8 @@ export default function SettingsScreen() {
         <View style={styles.section}>
           <View style={styles.profileCard}>
             <TouchableOpacity style={styles.avatarContainer} onPress={handlePickImage}>
-              {authMeQuery.data?.user?.avatarUrl ? (
-                <Image source={{ uri: authMeQuery.data.user.avatarUrl }} style={styles.avatar} />
+              {authMeQuery.data?.avatarUrl ? (
+                <Image source={{ uri: authMeQuery.data.avatarUrl }} style={styles.avatar} />
               ) : (
                 <View style={styles.avatarPlaceholder}>
                   <User size={32} color={theme.colors.gray[400]} />
@@ -818,7 +818,7 @@ export default function SettingsScreen() {
             </TouchableOpacity>
             <View style={styles.profileInfo}>
               <View style={styles.profileHeader}>
-                <Text style={styles.profileName}>{authMeQuery.data?.user?.displayName || "Loading..."}</Text>
+                <Text style={styles.profileName}>{authMeQuery.data?.displayName || "Loading..."}</Text>
                 <View style={[styles.planBadge, { backgroundColor: getPlanColor(plansQuery.data?.plan || "free") + "20" }]}>
                   {getPlanIcon(plansQuery.data?.plan || "free")}
                   <Text style={[styles.planBadgeText, { color: getPlanColor(plansQuery.data?.plan || "free") }]}>
@@ -826,9 +826,9 @@ export default function SettingsScreen() {
                   </Text>
                 </View>
               </View>
-              <Text style={styles.profileEmail}>{authMeQuery.data?.user?.email || ""}</Text>
+              <Text style={styles.profileEmail}>{authMeQuery.data?.email || ""}</Text>
               <Text style={styles.profileJoined}>
-                Joined {authMeQuery.data?.user?.createdAt ? new Date(authMeQuery.data.user.createdAt).toLocaleDateString() : ""}
+                Joined {authMeQuery.data?.createdAt ? new Date(authMeQuery.data.createdAt).toLocaleDateString() : ""}
               </Text>
             </View>
           </View>
@@ -1162,13 +1162,11 @@ export default function SettingsScreen() {
                 const runAt = new Date(Date.now() + 60000); // 1 minute from now
                 const result = await trpcClient.scheduler.queue.mutate({
                   contentId: `demo_content_${Date.now()}`,
-                  userId: "demo_user",
-                  platform: "x",
-                  runAt
+                  runAt: runAt.toISOString()
                 });
                 Alert.alert(
                   "Job Queued",
-                  `Job ${result.job?.id} scheduled for ${runAt.toLocaleTimeString()}`
+                  `Job ${result.jobId} scheduled for ${runAt.toLocaleTimeString()}`
                 );
               } catch (error) {
                 Alert.alert("Error", "Failed to queue job");
@@ -1200,7 +1198,7 @@ export default function SettingsScreen() {
                 const stats = await trpcClient.scheduler.stats.query();
                 Alert.alert(
                   "Job Statistics",
-                  `Total: ${stats.total}\nPending: ${stats.pending}\nCompleted: ${stats.completed}\nFailed: ${stats.failed}\nSuccess Rate: ${stats.recentActivity.successRate.toFixed(1)}%`
+                  `Total: ${stats.total}\nPending: ${stats.stats.pending}\nCompleted: ${stats.stats.completed}\nFailed: ${stats.stats.failed}\nSuccess Rate: ${stats.successRate.toFixed(1)}%`
                 );
               } catch (error) {
                 Alert.alert("Error", "Failed to fetch statistics");
