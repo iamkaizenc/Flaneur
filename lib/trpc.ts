@@ -487,8 +487,9 @@ function getTrpcUrl() {
     return '/api/trpc';
   }
 
-  // Native fallback: localhost (development)
-  return 'http://localhost:8081/api/trpc';
+  // Native fallback: Use LAN IP for real device testing
+  // Change this to your actual LAN IP address
+  return 'http://192.168.1.100:8081/api/trpc';
 }
 
 // Log the tRPC URL for debugging
@@ -582,7 +583,7 @@ export const trpcClient = trpc.createClient({
     httpBatchLink({
       url: getTrpcUrl(),
       transformer: superjson,
-      // HTML dönerse (örn. 404/SPA) erkenden yakala
+      // HTML response guard - catch when server returns HTML instead of JSON
       fetch(url, opts) {
         return fetch(url, opts).then(async (res) => {
           const ct = res.headers.get('content-type') || '';
@@ -590,7 +591,7 @@ export const trpcClient = trpc.createClient({
             const html = await res.text();
             console.error('[TRPC] HTML Response received:', html.substring(0, 200));
             throw new TRPCClientError(
-              `[HTML_RESPONSE] Expected JSON but received HTML: ${res.status} ${res.statusText}`
+              `[HTML_RESPONSE] Expected JSON but received HTML: ${res.status} ${res.statusText}. Check if tRPC server is running at ${url}`
             );
           }
           return res;

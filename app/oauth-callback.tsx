@@ -4,6 +4,7 @@ import { useLocalSearchParams, router } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { trpc } from "@/lib/trpc";
 import { theme } from "@/constants/theme";
+import { normalizeError } from "@/lib/errors";
 
 export default function OAuthCallback() {
   const { code, state, platform } = useLocalSearchParams<{
