@@ -9,6 +9,7 @@ import i18n from '../src/i18n';
 import { LanguageProvider } from '../src/providers/LanguageProvider';
 import { AIMarketerProvider } from "@/providers/AIMarketerProvider";
 import { trpc, trpcClient, getFallbackData } from "@/lib/trpc";
+import { BackendStatusProvider } from "@/lib/trpc-fallback";
 import { theme } from "@/constants/theme";
 
 SplashScreen.preventAutoHideAsync();
@@ -223,11 +224,13 @@ export default function RootLayout() {
         <LanguageProvider>
           <QueryClientProvider client={queryClient}>
             <trpc.Provider client={trpcClient} queryClient={queryClient}>
-              <GestureHandlerRootView style={{ flex: 1 }}>
-                <AIMarketerProvider>
-                  <RootLayoutNav />
-                </AIMarketerProvider>
-              </GestureHandlerRootView>
+              <BackendStatusProvider>
+                <GestureHandlerRootView style={{ flex: 1 }}>
+                  <AIMarketerProvider>
+                    <RootLayoutNav />
+                  </AIMarketerProvider>
+                </GestureHandlerRootView>
+              </BackendStatusProvider>
             </trpc.Provider>
           </QueryClientProvider>
         </LanguageProvider>
