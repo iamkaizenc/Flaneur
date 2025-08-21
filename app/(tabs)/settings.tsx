@@ -455,7 +455,7 @@ export default function SettingsScreen() {
   
   const { purchasePlan, restorePurchases, isLoading: purchaseLoading } = usePurchase();
 
-  const isLiveMode = process.env.EXPO_PUBLIC_LIVE_MODE === "true" || process.env.LIVE_MODE === "true";
+  const isLiveMode = process.env.EXPO_PUBLIC_LIVE_MODE === "true";
   const availablePlatforms = ["x", "instagram", "facebook", "linkedin", "tiktok", "telegram"];
   
   const handleConnect = async (platform: string) => {
@@ -474,14 +474,10 @@ export default function SettingsScreen() {
         console.log(`[OAuth] Opening auth URL for ${platform}:`, result.authUrl);
         
         if (isLiveMode) {
-          // In LIVE mode, open the actual OAuth URL
           if (Platform.OS === 'web') {
             window.open(result.authUrl, '_blank');
           } else {
-            // Open the OAuth URL in the device's browser
-            Linking.openURL(result.authUrl).catch(() => {
-              Alert.alert("Error", "Could not open authorization URL");
-            });
+            await Linking.openURL(result.authUrl);
           }
         } else {
           // In DRY_RUN mode, simulate successful connection
@@ -551,10 +547,7 @@ export default function SettingsScreen() {
           if (Platform.OS === 'web') {
             window.open(result.authUrl, '_blank');
           } else {
-            // Open the OAuth URL in the device's browser
-            Linking.openURL(result.authUrl).catch(() => {
-              Alert.alert("Error", "Could not open authorization URL");
-            });
+            await Linking.openURL(result.authUrl);
           }
         } else {
           Alert.alert(

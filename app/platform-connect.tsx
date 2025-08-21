@@ -74,9 +74,7 @@ export default function PlatformConnectScreen() {
   
   // Check if we're in LIVE mode
   useEffect(() => {
-    setIsLiveMode(
-      process.env.EXPO_PUBLIC_LIVE_MODE === "true" || process.env.LIVE_MODE === "true"
-    );
+    setIsLiveMode(process.env.EXPO_PUBLIC_LIVE_MODE === "true");
   }, []);
 
   const platforms = [
@@ -113,14 +111,10 @@ export default function PlatformConnectScreen() {
         console.log(`[Platform Connect] OAuth URL for ${platformKey}:`, startResult.authUrl);
         
         if (isLiveMode) {
-          // In LIVE mode, open the actual OAuth URL
           if (Platform.OS === 'web') {
             window.open(startResult.authUrl, '_blank');
           } else {
-            // Open the OAuth URL in the device's browser
-            Linking.openURL(startResult.authUrl).catch(() => {
-              Alert.alert("Error", "Could not open authorization URL");
-            });
+            await Linking.openURL(startResult.authUrl);
           }
           
           // In LIVE mode, we don't simulate the callback - it will come from the actual OAuth flow
