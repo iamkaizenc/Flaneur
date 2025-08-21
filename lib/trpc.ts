@@ -1,5 +1,5 @@
 import { createTRPCReact } from "@trpc/react-query";
-import { httpLink } from "@trpc/client";
+import { httpBatchLink, TRPCClientError } from "@trpc/client";
 import type { AppRouter } from "@/backend/trpc/app-router";
 import superjson from "superjson";
 
@@ -468,29 +468,26 @@ export const mockFallbacks = {
 
 export const trpc = createTRPCReact<AppRouter>();
 
-const getBaseUrl = () => {
-  // Check for explicit API URL first (works for both web and mobile)
-  const apiUrl = process.env.EXPO_PUBLIC_API_URL;
-  if (apiUrl) {
-    console.log('[tRPC] Using configured API URL:', apiUrl);
-    return apiUrl;
-  }
-  
-  // For web, use relative URLs to avoid CORS issues
-  if (typeof window !== 'undefined') {
-    console.log('[tRPC] Using relative URL for web');
-    return '';
-  }
-  
-  // Development fallback for mobile - use localhost:8081 for Expo dev server
-  console.log('[tRPC] Using fallback API URL: http://localhost:8081');
-  return 'http://localhost:8081';
-};
+function getTrpcUrl() {
+  // Expo/Web'de en güvenlisi ortam değişkeni
+  const fromEnv =
+    process.env.EXPO_PUBLIC_TRPC_URL ||
+    process.env.NEXT_PUBLIC_TRPC_URL ||
+    process.env.EXPO_PUBLIC_API_URL; // tam /trpc ile bitiyorsa bunu verin
+
+  if (fromEnv) return fromEnv.replace(/\/$/, '') + '/api/trpc';
+
+  // Web'de: aynı origin altında reverse-proxy varsa
+  if (typeof window !== 'undefined') return '/api/trpc';
+
+  // Native cihaz/Emülatör: LAN IP'nizi yazın ve /trpc ile bitirin
+  return 'http://localhost:8081/api/trpc';
+}
 
 // Test function to check backend connectivity
 export const testBackendConnection = async (): Promise<{ success: boolean; message: string; details?: any }> => {
   try {
-    const baseUrl = getBaseUrl();
+    const baseUrl = getTrpcUrl().replace('/api/trpc', '');
     const healthUrl = `${baseUrl}/api/health`;
     
     console.log('[tRPC] Testing backend connection to:', healthUrl);
@@ -539,121 +536,54 @@ export const testBackendConnection = async (): Promise<{ success: boolean; messa
 
 
 // Create a fallback link that returns mock data when the server is unavailable
-const createFallbackLink = () => {
-  return {
-    request: (op: any) => {
-      return new Promise((resolve) => {
-        // Extract the procedure path from the operation
-        const path = op.path;
-        console.log('[tRPC] Fallback mode - returning mock data for:', path);
-        
-        // Get mock data for this path
-        const mockData = getFallbackData(path);
-        
-        if (mockData) {
-          resolve({
-            result: {
-              data: mockData
-            }
-          });
-        } else {
-          // Return a generic error for unknown paths
-          resolve({
-            error: {
-              message: `No mock data available for ${path}`,
-              code: 'MOCK_DATA_NOT_FOUND'
-            }
-          });
-        }
-      });
-    }
-  };
-};
+// const createFallbackLink = () => {
+//   return {
+//     request: (op: any) => {
+//       return new Promise((resolve) => {
+//         // Extract the procedure path from the operation
+//         const path = op.path;
+//         console.log('[tRPC] Fallback mode - returning mock data for:', path);
+//         
+//         // Get mock data for this path
+//         const mockData = getFallbackData(path);
+//         
+//         if (mockData) {
+//           resolve({
+//             result: {
+//               data: mockData
+//             }
+//           });
+//         } else {
+//           // Return a generic error for unknown paths
+//           resolve({
+//             error: {
+//               message: `No mock data available for ${path}`,
+//               code: 'MOCK_DATA_NOT_FOUND'
+//             }
+//           });
+//         }
+//       });
+//     }
+//   };
+// };
 
 export const trpcClient = trpc.createClient({
   links: [
-    httpLink({
-      url: `${getBaseUrl()}/api/trpc`,
+    httpBatchLink({
+      url: getTrpcUrl(),
       transformer: superjson,
-      fetch: async (url, options) => {
-        try {
-          console.log('[tRPC] Making request to:', url);
-          console.log('[tRPC] Request options:', {
-            method: options?.method || 'GET',
-            headers: options?.headers,
-            body: options?.body ? 'present' : 'none'
-          });
-          
-          const response = await fetch(url, {
-            ...options,
-            headers: {
-              'Content-Type': 'application/json',
-              'Accept': 'application/json',
-              'x-trpc-source': 'react-native',
-              ...options?.headers,
-            },
-          });
-          
-          console.log('[tRPC] Response status:', response.status, 'Content-Type:', response.headers.get('content-type'));
-          
-          // For non-ok responses, try to parse as JSON first
-          if (!response.ok) {
-            const responseText = await response.text();
-            console.error('[tRPC] HTTP error:', response.status, responseText.substring(0, 200));
-            
-            // If it's HTML, it means we're hitting the wrong endpoint
-            if (responseText.includes('<!DOCTYPE html>') || responseText.includes('<html')) {
-              console.error('[tRPC] Got HTML response instead of JSON. This usually means:');
-              console.error('[tRPC] 1. The tRPC server is not running');
-              console.error('[tRPC] 2. The API endpoint path is incorrect');
-              console.error('[tRPC] 3. CORS issues or wrong port');
-              console.error('[tRPC] 4. Request is being intercepted by a proxy or tunnel');
-              console.error('[tRPC] Current base URL:', getBaseUrl());
-              console.error('[tRPC] Full request URL:', url);
-              
-              // Throw a proper error that React Query can handle
-              const error = new Error('Backend server is not responding correctly. Please check your connection and try again.');
-              error.name = 'TRPCClientError';
-              throw error;
-            }
-            
-            // Try to parse as JSON error
-            try {
-              const errorData = JSON.parse(responseText);
-              // Throw a proper error with the server message
-              const error = new Error(errorData.error?.message || `HTTP ${response.status}: ${response.statusText}`);
-              error.name = 'HTTPError';
-              throw error;
-            } catch {
-              // If we can't parse the error, throw a generic one
-              const error = new Error(`HTTP ${response.status}: ${response.statusText}`);
-              error.name = 'HTTPError';
-              throw error;
-            }
+      // HTML dönerse (örn. 404/SPA) erkenden yakala
+      fetch(url, opts) {
+        return fetch(url, opts).then(async (res) => {
+          const ct = res.headers.get('content-type') || '';
+          if (ct.includes('text/html')) {
+            await res.text(); // consume the response
+            throw new TRPCClientError(
+              `[HTML_RESPONSE] Beklenen JSON yerine HTML geldi: ${res.status} ${res.statusText}`
+            );
           }
-          
-          return response;
-        } catch (error) {
-          console.error('[tRPC] Fetch error:', error);
-          
-          // For development, provide helpful error messages
-          if (error instanceof TypeError && error.message.includes('Failed to fetch')) {
-            console.error('[tRPC] Network error - make sure the development server is running');
-            const networkError = new Error('Cannot connect to server. Please check your internet connection and try again.');
-            networkError.name = 'NetworkError';
-            throw networkError;
-          }
-          
-          // Re-throw the error with proper structure
-          if (error instanceof Error) {
-            throw error;
-          }
-          
-          // Fallback for unknown errors
-          const unknownError = new Error('An unexpected error occurred. Please try again.');
-          unknownError.name = 'UnknownError';
-          throw unknownError;
-        }
+          return res;
+        });
       },
     }),
   ],
