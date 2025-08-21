@@ -522,9 +522,9 @@ function getTrpcUrl() {
     return '/api/trpc';
   }
 
-  // Native fallback: Use LAN IP for real device testing
-  // Change this to your actual LAN IP address
-  const fallbackUrl = 'http://192.168.1.100:8081/api/trpc';
+  // Native fallback: Use localhost for development
+  // For real device testing, change this to your LAN IP address
+  const fallbackUrl = 'http://localhost:8081/api/trpc';
   console.log('[TRPC] Using native fallback:', fallbackUrl);
   return fallbackUrl;
 }
@@ -535,8 +535,8 @@ console.log('[TRPC] Using URL:', getTrpcUrl());
 // Test function to check backend connectivity
 export const testBackendConnection = async (): Promise<{ success: boolean; message: string; details?: any }> => {
   try {
-    const baseUrl = getTrpcUrl().replace('/trpc', '');
-    const healthUrl = `${baseUrl}/health`;
+    const baseUrl = getTrpcUrl().replace('/api/trpc', '').replace('/trpc', '');
+    const healthUrl = `${baseUrl}/api/health`;
     
     console.log('[tRPC] Testing backend connection to:', healthUrl);
     
@@ -633,8 +633,8 @@ async function quickBackendTest(): Promise<boolean> {
   }
   
   try {
-    const baseUrl = getTrpcUrl().replace('/trpc', '');
-    const healthUrl = `${baseUrl}/health`;
+    const baseUrl = getTrpcUrl().replace('/api/trpc', '').replace('/trpc', '');
+    const healthUrl = `${baseUrl}/api/health`;
     
     const response = await fetch(healthUrl, {
       method: 'GET',
