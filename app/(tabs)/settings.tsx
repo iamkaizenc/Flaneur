@@ -502,7 +502,20 @@ export default function SettingsScreen() {
       }
     } catch (error) {
       console.error('[OAuth] Connection error:', error);
-      Alert.alert("Error", "Failed to connect account");
+      
+      // Better error handling with specific messages
+      let errorMessage = "Failed to connect account";
+      if (error instanceof Error) {
+        if (error.name === 'NetworkError') {
+          errorMessage = "Cannot connect to server. Please check your internet connection and try again.";
+        } else if (error.message.includes('Backend server may not be running')) {
+          errorMessage = "Backend server is not available. Please try again later.";
+        } else {
+          errorMessage = error.message;
+        }
+      }
+      
+      Alert.alert("Connection Error", errorMessage);
     }
   };
 
@@ -571,7 +584,20 @@ export default function SettingsScreen() {
       }
     } catch (error) {
       console.error('[OAuth] Fix connection error:', error);
-      Alert.alert("Error", "Failed to fix connection");
+      
+      // Better error handling with specific messages
+      let errorMessage = "Failed to fix connection";
+      if (error instanceof Error) {
+        if (error.name === 'NetworkError') {
+          errorMessage = "Cannot connect to server. Please check your internet connection and try again.";
+        } else if (error.message.includes('Backend server may not be running')) {
+          errorMessage = "Backend server is not available. Please try again later.";
+        } else {
+          errorMessage = error.message;
+        }
+      }
+      
+      Alert.alert("Connection Error", errorMessage);
     }
   };
 

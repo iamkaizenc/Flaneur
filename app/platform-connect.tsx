@@ -160,11 +160,20 @@ export default function PlatformConnectScreen() {
       }
     } catch (error) {
       console.error(`[Platform Connect] Start error:`, error);
-      Alert.alert(
-        "Connection Failed",
-        `Failed to start ${platformName} connection. Please try again.`,
-        [{ text: "OK" }]
-      );
+      
+      // Better error handling with specific messages
+      let errorMessage = `Failed to start ${platformName} connection. Please try again.`;
+      if (error instanceof Error) {
+        if (error.name === 'NetworkError') {
+          errorMessage = "Cannot connect to server. Please check your internet connection and try again.";
+        } else if (error.message.includes('Backend server may not be running')) {
+          errorMessage = "Backend server is not available. Please try again later.";
+        } else {
+          errorMessage = error.message;
+        }
+      }
+      
+      Alert.alert("Connection Failed", errorMessage, [{ text: "OK" }]);
       setLoadingPlatforms(prev => {
         const newSet = new Set(prev);
         newSet.delete(platformName);
