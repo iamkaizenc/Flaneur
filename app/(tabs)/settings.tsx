@@ -52,6 +52,7 @@ import {
 } from "lucide-react-native";
 import { theme, brandName } from "@/constants/theme";
 import { trpc, trpcClient, testBackendConnection } from "@/lib/trpc";
+import { normalizeError } from "@/lib/errors";
 import { usePurchase } from "@/hooks/usePurchase";
 import { LanguagePicker } from "../../src/components/LanguagePicker";
 
@@ -295,19 +296,7 @@ const RiskCenterSection: React.FC = () => {
   const riskSimulateMutation = trpc.risk.simulateAlert.useMutation();
   const [riskNotificationsEnabled, setRiskNotificationsEnabled] = useState(true);
 
-  // Helper function to normalize error messages
-  const normalizeError = (err: unknown): string => {
-    if (typeof err === "string") return err;
-    if (err && typeof err === "object") {
-      const anyErr = err as any;
-      if (anyErr.message) return String(anyErr.message);
-      if (anyErr.data?.code || anyErr.data?.message) {
-        return `${anyErr.data.code ?? "ERR"}: ${anyErr.data.message ?? "Unknown error"}`;
-      }
-      try { return JSON.stringify(anyErr); } catch { /* noop */ }
-    }
-    return "Unknown error";
-  };
+
 
   const handleSimulateAlert = async () => {
     try {
@@ -470,19 +459,7 @@ export default function SettingsScreen() {
   
   const { purchasePlan, restorePurchases, isLoading: purchaseLoading } = usePurchase();
 
-  // Helper function to normalize error messages
-  const normalizeError = (err: unknown): string => {
-    if (typeof err === "string") return err;
-    if (err && typeof err === "object") {
-      const anyErr = err as any;
-      if (anyErr.message) return String(anyErr.message);
-      if (anyErr.data?.code || anyErr.data?.message) {
-        return `${anyErr.data.code ?? "ERR"}: ${anyErr.data.message ?? "Unknown error"}`;
-      }
-      try { return JSON.stringify(anyErr); } catch { /* noop */ }
-    }
-    return "Unknown error";
-  };
+
 
   const isLiveMode = process.env.EXPO_PUBLIC_LIVE_MODE === "true";
   const availablePlatforms = ["x", "instagram", "facebook", "linkedin", "tiktok", "telegram"];

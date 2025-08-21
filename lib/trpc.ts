@@ -473,16 +473,22 @@ function getTrpcUrl() {
   const fromEnv =
     process.env.EXPO_PUBLIC_TRPC_URL ||
     process.env.NEXT_PUBLIC_TRPC_URL ||
-    process.env.EXPO_PUBLIC_API_URL; // tam /trpc ile bitiyorsa bunu verin
+    process.env.EXPO_PUBLIC_API_URL;
 
-  if (fromEnv) return fromEnv.replace(/\/$/, '') + '/api/trpc';
+  if (fromEnv) {
+    const baseUrl = fromEnv.replace(/\/$/, '');
+    return baseUrl.endsWith('/api/trpc') ? baseUrl : `${baseUrl}/api/trpc`;
+  }
 
   // Web'de: aynı origin altında reverse-proxy varsa
   if (typeof window !== 'undefined') return '/api/trpc';
 
-  // Native cihaz/Emülatör: LAN IP'nizi yazın ve /trpc ile bitirin
-  return 'http://localhost:8081/api/trpc';
+  // Native cihaz/Emülatör: LAN IP'nizi yazın ve /api/trpc ile bitirin
+  return 'http://192.168.1.10:8787/api/trpc';
 }
+
+// Log the tRPC URL for debugging
+console.log('[TRPC] Using URL:', getTrpcUrl());
 
 // Test function to check backend connectivity
 export const testBackendConnection = async (): Promise<{ success: boolean; message: string; details?: any }> => {
@@ -577,12 +583,16 @@ export const trpcClient = trpc.createClient({
         return fetch(url, opts).then(async (res) => {
           const ct = res.headers.get('content-type') || '';
           if (ct.includes('text/html')) {
-            await res.text(); // consume the response
+            const html = await res.text();
+            console.error('[TRPC] HTML Response received:', html.substring(0, 200));
             throw new TRPCClientError(
-              `[HTML_RESPONSE] Beklenen JSON yerine HTML geldi: ${res.status} ${res.statusText}`
+              `[HTML_RESPONSE] Expected JSON but received HTML: ${res.status} ${res.statusText}`
             );
           }
           return res;
+        }).catch((error) => {
+          console.error('[TRPC] Fetch error:', error);
+          throw error;
         });
       },
     }),
