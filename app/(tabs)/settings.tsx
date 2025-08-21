@@ -295,13 +295,28 @@ const RiskCenterSection: React.FC = () => {
   const riskSimulateMutation = trpc.risk.simulateAlert.useMutation();
   const [riskNotificationsEnabled, setRiskNotificationsEnabled] = useState(true);
 
+  // Helper function to normalize error messages
+  const normalizeError = (err: unknown): string => {
+    if (typeof err === "string") return err;
+    if (err && typeof err === "object") {
+      const anyErr = err as any;
+      if (anyErr.message) return String(anyErr.message);
+      if (anyErr.data?.code || anyErr.data?.message) {
+        return `${anyErr.data.code ?? "ERR"}: ${anyErr.data.message ?? "Unknown error"}`;
+      }
+      try { return JSON.stringify(anyErr); } catch { /* noop */ }
+    }
+    return "Unknown error";
+  };
+
   const handleSimulateAlert = async () => {
     try {
       const result = await riskSimulateMutation.mutateAsync();
       riskStatusQuery.refetch();
       Alert.alert("Demo Alert", "Risk uyarısı oluşturuldu (demo)");
     } catch (error) {
-      Alert.alert("Error", "Demo alert oluşturulamadı");
+      console.error('[Risk] Demo alert error:', error);
+      Alert.alert("Error", normalizeError(error));
     }
   };
 
@@ -455,6 +470,20 @@ export default function SettingsScreen() {
   
   const { purchasePlan, restorePurchases, isLoading: purchaseLoading } = usePurchase();
 
+  // Helper function to normalize error messages
+  const normalizeError = (err: unknown): string => {
+    if (typeof err === "string") return err;
+    if (err && typeof err === "object") {
+      const anyErr = err as any;
+      if (anyErr.message) return String(anyErr.message);
+      if (anyErr.data?.code || anyErr.data?.message) {
+        return `${anyErr.data.code ?? "ERR"}: ${anyErr.data.message ?? "Unknown error"}`;
+      }
+      try { return JSON.stringify(anyErr); } catch { /* noop */ }
+    }
+    return "Unknown error";
+  };
+
   const isLiveMode = process.env.EXPO_PUBLIC_LIVE_MODE === "true";
   const availablePlatforms = ["x", "instagram", "facebook", "linkedin", "tiktok", "telegram"];
   
@@ -502,32 +531,7 @@ export default function SettingsScreen() {
       }
     } catch (error) {
       console.error('[OAuth] Connection error:', error);
-      
-      // Better error handling with specific messages
-      let errorMessage = "Failed to connect account";
-      if (error instanceof Error) {
-        if (error.name === 'NetworkError') {
-          errorMessage = "Cannot connect to server. Please check your internet connection and try again.";
-        } else if (error.message.includes('Backend server may not be running')) {
-          errorMessage = "Backend server is not available. Please try again later.";
-        } else if (error.message.includes('Unexpected token')) {
-          errorMessage = "Backend server is not responding correctly. Please try again later.";
-        } else {
-          errorMessage = error.message;
-        }
-      } else if (typeof error === 'object' && error !== null) {
-        // Handle tRPC error objects
-        const trpcError = error as any;
-        if (trpcError.message) {
-          errorMessage = trpcError.message;
-        } else if (trpcError.data?.message) {
-          errorMessage = trpcError.data.message;
-        } else {
-          errorMessage = "An unexpected error occurred. Please try again.";
-        }
-      }
-      
-      Alert.alert("Connection Error", errorMessage);
+      Alert.alert("Connection Error", normalizeError(error));
     }
   };
 
@@ -547,7 +551,8 @@ export default function SettingsScreen() {
               settingsQuery.refetch();
               Alert.alert("Success", `${getPlatformConfig(platform).name} disconnected successfully`);
             } catch (error) {
-              Alert.alert("Error", "Failed to disconnect account");
+              console.error('[OAuth] Disconnect error:', error);
+              Alert.alert("Error", normalizeError(error));
             }
           }
         }
@@ -596,32 +601,7 @@ export default function SettingsScreen() {
       }
     } catch (error) {
       console.error('[OAuth] Fix connection error:', error);
-      
-      // Better error handling with specific messages
-      let errorMessage = "Failed to fix connection";
-      if (error instanceof Error) {
-        if (error.name === 'NetworkError') {
-          errorMessage = "Cannot connect to server. Please check your internet connection and try again.";
-        } else if (error.message.includes('Backend server may not be running')) {
-          errorMessage = "Backend server is not available. Please try again later.";
-        } else if (error.message.includes('Unexpected token')) {
-          errorMessage = "Backend server is not responding correctly. Please try again later.";
-        } else {
-          errorMessage = error.message;
-        }
-      } else if (typeof error === 'object' && error !== null) {
-        // Handle tRPC error objects
-        const trpcError = error as any;
-        if (trpcError.message) {
-          errorMessage = trpcError.message;
-        } else if (trpcError.data?.message) {
-          errorMessage = trpcError.data.message;
-        } else {
-          errorMessage = "An unexpected error occurred. Please try again.";
-        }
-      }
-      
-      Alert.alert("Connection Error", errorMessage);
+      Alert.alert("Connection Error", normalizeError(error));
     }
   };
 
@@ -630,7 +610,8 @@ export default function SettingsScreen() {
       const result = await settingsTestNotificationMutation.mutateAsync({ channel });
       Alert.alert("Success", result.message);
     } catch (error) {
-      Alert.alert("Error", "Failed to send test notification");
+      console.error('[Settings] Test notification error:', error);
+      Alert.alert("Error", normalizeError(error));
     }
   };
 
@@ -648,7 +629,8 @@ export default function SettingsScreen() {
               await authLogoutMutation.mutateAsync();
               // Navigate to login screen
             } catch (error) {
-              Alert.alert("Error", "Failed to logout");
+              console.error('[Auth] Logout error:', error);
+              Alert.alert("Error", normalizeError(error));
             }
           },
         },
@@ -669,7 +651,8 @@ export default function SettingsScreen() {
         Alert.alert("Purchase Failed", purchaseResult.message || "Failed to complete purchase");
       }
     } catch (error) {
-      Alert.alert("Error", "Failed to upgrade plan");
+      console.error('[Plans] Upgrade error:', error);
+      Alert.alert("Error", normalizeError(error));
     }
   };
 
@@ -697,7 +680,8 @@ export default function SettingsScreen() {
         authMeQuery.refetch();
         Alert.alert("Success", "Profile picture updated successfully");
       } catch (error) {
-        Alert.alert("Error", "Failed to update profile picture");
+        console.error('[Profile] Update avatar error:', error);
+        Alert.alert("Error", normalizeError(error));
       }
     }
   };
@@ -720,7 +704,8 @@ export default function SettingsScreen() {
       setShowProfileModal(false);
       Alert.alert("Success", "Profile updated successfully");
     } catch (error) {
-      Alert.alert("Error", "Failed to update profile");
+      console.error('[Profile] Update profile error:', error);
+      Alert.alert("Error", normalizeError(error));
     }
   };
 
@@ -744,7 +729,8 @@ export default function SettingsScreen() {
       setPasswordForm({ oldPassword: "", newPassword: "", confirmPassword: "" });
       Alert.alert("Success", "Password updated successfully");
     } catch (error) {
-      Alert.alert("Error", "Failed to update password. Please check your current password.");
+      console.error('[Auth] Update password error:', error);
+      Alert.alert("Error", normalizeError(error));
     }
   };
 
@@ -769,7 +755,8 @@ export default function SettingsScreen() {
               Alert.alert("Account Deleted", "Your account has been permanently deleted.");
               // Navigate to login screen
             } catch (error) {
-              Alert.alert("Error", "Failed to delete account. Please check your password.");
+              console.error('[Auth] Delete account error:', error);
+              Alert.alert("Error", normalizeError(error));
             }
           },
         },
@@ -787,7 +774,8 @@ export default function SettingsScreen() {
         Alert.alert("No Purchases", "No previous purchases found to restore");
       }
     } catch (error) {
-      Alert.alert("Error", "Failed to restore purchases");
+      console.error('[Purchase] Restore error:', error);
+      Alert.alert("Error", normalizeError(error));
     }
   };
 
@@ -797,7 +785,8 @@ export default function SettingsScreen() {
       riskStatusQuery.refetch();
       Alert.alert("Demo Alert Created", result.message);
     } catch (error) {
-      Alert.alert("Error", "Failed to create demo alert");
+      console.error('[Risk] Simulate alert error:', error);
+      Alert.alert("Error", normalizeError(error));
     }
   };
 

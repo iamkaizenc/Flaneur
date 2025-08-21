@@ -72,6 +72,20 @@ export default function PlatformConnectScreen() {
   const [loadingPlatforms, setLoadingPlatforms] = useState<Set<string>>(new Set());
   const [isLiveMode, setIsLiveMode] = useState<boolean>(false);
   
+  // Helper function to normalize error messages
+  const normalizeError = (err: unknown): string => {
+    if (typeof err === "string") return err;
+    if (err && typeof err === "object") {
+      const anyErr = err as any;
+      if (anyErr.message) return String(anyErr.message);
+      if (anyErr.data?.code || anyErr.data?.message) {
+        return `${anyErr.data.code ?? "ERR"}: ${anyErr.data.message ?? "Unknown error"}`;
+      }
+      try { return JSON.stringify(anyErr); } catch { /* noop */ }
+    }
+    return "Unknown error";
+  };
+
   // Check if we're in LIVE mode
   useEffect(() => {
     setIsLiveMode(process.env.EXPO_PUBLIC_LIVE_MODE === "true");
@@ -145,7 +159,7 @@ export default function PlatformConnectScreen() {
               console.error(`[Platform Connect] Callback error:`, error);
               Alert.alert(
                 "Connection Failed",
-                `Failed to connect ${platformName}. Please try again.`,
+                normalizeError(error),
                 [{ text: "OK" }]
               );
             } finally {
@@ -160,32 +174,7 @@ export default function PlatformConnectScreen() {
       }
     } catch (error) {
       console.error(`[Platform Connect] Start error:`, error);
-      
-      // Better error handling with specific messages
-      let errorMessage = `Failed to start ${platformName} connection. Please try again.`;
-      if (error instanceof Error) {
-        if (error.name === 'NetworkError') {
-          errorMessage = "Cannot connect to server. Please check your internet connection and try again.";
-        } else if (error.message.includes('Backend server may not be running')) {
-          errorMessage = "Backend server is not available. Please try again later.";
-        } else if (error.message.includes('Unexpected token')) {
-          errorMessage = "Backend server is not responding correctly. Please try again later.";
-        } else {
-          errorMessage = error.message;
-        }
-      } else if (typeof error === 'object' && error !== null) {
-        // Handle tRPC error objects
-        const trpcError = error as any;
-        if (trpcError.message) {
-          errorMessage = trpcError.message;
-        } else if (trpcError.data?.message) {
-          errorMessage = trpcError.data.message;
-        } else {
-          errorMessage = "An unexpected error occurred. Please try again.";
-        }
-      }
-      
-      Alert.alert("Connection Failed", errorMessage, [{ text: "OK" }]);
+      Alert.alert("Connection Failed", normalizeError(error), [{ text: "OK" }]);
       setLoadingPlatforms(prev => {
         const newSet = new Set(prev);
         newSet.delete(platformName);

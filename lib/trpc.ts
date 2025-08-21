@@ -469,19 +469,20 @@ export const mockFallbacks = {
 export const trpc = createTRPCReact<AppRouter>();
 
 const getBaseUrl = () => {
+  // Check for explicit API URL first (works for both web and mobile)
+  const apiUrl = process.env.EXPO_PUBLIC_API_URL;
+  if (apiUrl) {
+    console.log('[tRPC] Using configured API URL:', apiUrl);
+    return apiUrl;
+  }
+  
   // For web, use relative URLs to avoid CORS issues
   if (typeof window !== 'undefined') {
     console.log('[tRPC] Using relative URL for web');
     return '';
   }
   
-  // For mobile, use the configured API URL
-  if (process.env.EXPO_PUBLIC_API_URL) {
-    console.log('[tRPC] Using configured API URL:', process.env.EXPO_PUBLIC_API_URL);
-    return process.env.EXPO_PUBLIC_API_URL;
-  }
-  
-  // Development fallback - use localhost:8081 for Expo dev server
+  // Development fallback for mobile - use localhost:8081 for Expo dev server
   console.log('[tRPC] Using fallback API URL: http://localhost:8081');
   return 'http://localhost:8081';
 };
@@ -601,16 +602,18 @@ export const trpcClient = trpc.createClient({
             console.error('[tRPC] HTTP error:', response.status, responseText.substring(0, 200));
             
             // If it's HTML, it means we're hitting the wrong endpoint
-            if (responseText.includes('<!DOCTYPE html>')) {
+            if (responseText.includes('<!DOCTYPE html>') || responseText.includes('<html')) {
               console.error('[tRPC] Got HTML response instead of JSON. This usually means:');
               console.error('[tRPC] 1. The tRPC server is not running');
               console.error('[tRPC] 2. The API endpoint path is incorrect');
               console.error('[tRPC] 3. CORS issues or wrong port');
               console.error('[tRPC] 4. Request is being intercepted by a proxy or tunnel');
+              console.error('[tRPC] Current base URL:', getBaseUrl());
+              console.error('[tRPC] Full request URL:', url);
               
               // Throw a proper error that React Query can handle
-              const error = new Error('Backend server is not responding correctly. Please try again later.');
-              error.name = 'NetworkError';
+              const error = new Error('Backend server is not responding correctly. Please check your connection and try again.');
+              error.name = 'TRPCClientError';
               throw error;
             }
             
