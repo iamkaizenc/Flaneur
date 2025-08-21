@@ -128,7 +128,12 @@ export default function PlatformConnectScreen() {
           if (Platform.OS === 'web') {
             window.open(startResult.authUrl, '_blank');
           } else {
-            await Linking.openURL(startResult.authUrl);
+            try {
+              await Linking.openURL(startResult.authUrl);
+            } catch (linkError) {
+              console.error('[Platform Connect] Failed to open URL:', linkError);
+              Alert.alert("Error", "Could not open authorization URL");
+            }
           }
           
           // In LIVE mode, we don't simulate the callback - it will come from the actual OAuth flow

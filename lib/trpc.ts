@@ -469,22 +469,26 @@ export const mockFallbacks = {
 export const trpc = createTRPCReact<AppRouter>();
 
 function getTrpcUrl() {
-  // Expo/Web'de en güvenlisi ortam değişkeni
-  const fromEnv =
-    process.env.EXPO_PUBLIC_TRPC_URL ||
-    process.env.NEXT_PUBLIC_TRPC_URL ||
-    process.env.EXPO_PUBLIC_API_URL;
+  // Check for explicit tRPC URL first
+  const explicitTrpcUrl = process.env.EXPO_PUBLIC_TRPC_URL;
+  if (explicitTrpcUrl) {
+    return explicitTrpcUrl.replace(/\/$/, '');
+  }
 
-  if (fromEnv) {
-    const baseUrl = fromEnv.replace(/\/$/, '');
+  // Check for API base URL and append /api/trpc
+  const apiUrl = process.env.EXPO_PUBLIC_API_URL;
+  if (apiUrl) {
+    const baseUrl = apiUrl.replace(/\/$/, '');
     return baseUrl.endsWith('/api/trpc') ? baseUrl : `${baseUrl}/api/trpc`;
   }
 
-  // Web'de: aynı origin altında reverse-proxy varsa
-  if (typeof window !== 'undefined') return '/api/trpc';
+  // Web fallback: same origin
+  if (typeof window !== 'undefined') {
+    return '/api/trpc';
+  }
 
-  // Native cihaz/Emülatör: LAN IP'nizi yazın ve /api/trpc ile bitirin
-  return 'http://192.168.1.10:8787/api/trpc';
+  // Native fallback: localhost (development)
+  return 'http://localhost:8081/api/trpc';
 }
 
 // Log the tRPC URL for debugging

@@ -483,7 +483,12 @@ export default function SettingsScreen() {
           if (Platform.OS === 'web') {
             window.open(result.authUrl, '_blank');
           } else {
-            await Linking.openURL(result.authUrl);
+            try {
+              await Linking.openURL(result.authUrl);
+            } catch (linkError) {
+              console.error('[OAuth] Failed to open URL:', linkError);
+              Alert.alert("Error", "Could not open authorization URL");
+            }
           }
         } else {
           // In DRY_RUN mode, simulate successful connection
@@ -554,7 +559,12 @@ export default function SettingsScreen() {
           if (Platform.OS === 'web') {
             window.open(result.authUrl, '_blank');
           } else {
-            await Linking.openURL(result.authUrl);
+            try {
+              await Linking.openURL(result.authUrl);
+            } catch (linkError) {
+              console.error('[OAuth] Failed to open URL:', linkError);
+              Alert.alert("Error", "Could not open authorization URL");
+            }
           }
         } else {
           Alert.alert(
