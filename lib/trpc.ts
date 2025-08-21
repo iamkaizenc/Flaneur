@@ -472,6 +472,7 @@ function getTrpcUrl() {
   // Check for explicit tRPC URL first
   const explicitTrpcUrl = process.env.EXPO_PUBLIC_TRPC_URL;
   if (explicitTrpcUrl) {
+    console.log('[TRPC] Using explicit tRPC URL:', explicitTrpcUrl);
     return explicitTrpcUrl.replace(/\/$/, '');
   }
 
@@ -480,17 +481,22 @@ function getTrpcUrl() {
   if (apiUrl) {
     const baseUrl = apiUrl.replace(/\/$/, '');
     // Backend is mounted at /api, so tRPC is at /api/trpc
-    return baseUrl.endsWith('/trpc') ? baseUrl : `${baseUrl}/api/trpc`;
+    const trpcUrl = baseUrl.endsWith('/trpc') ? baseUrl : `${baseUrl}/api/trpc`;
+    console.log('[TRPC] Using API URL with /api/trpc:', trpcUrl);
+    return trpcUrl;
   }
 
   // Web fallback: same origin with /api/trpc path
   if (typeof window !== 'undefined') {
+    console.log('[TRPC] Using web fallback: /api/trpc');
     return '/api/trpc';
   }
 
   // Native fallback: Use LAN IP for real device testing
   // Change this to your actual LAN IP address
-  return 'http://192.168.1.100:8081/api/trpc';
+  const fallbackUrl = 'http://192.168.1.100:8081/api/trpc';
+  console.log('[TRPC] Using native fallback:', fallbackUrl);
+  return fallbackUrl;
 }
 
 // Log the tRPC URL for debugging
@@ -584,22 +590,62 @@ export const trpcClient = trpc.createClient({
     httpBatchLink({
       url: getTrpcUrl(),
       transformer: superjson,
-      // HTML response guard - catch when server returns HTML instead of JSON
+      // Enhanced error handling and HTML response guard
       fetch(url, opts) {
-        return fetch(url, opts).then(async (res) => {
-          const ct = res.headers.get('content-type') || '';
-          if (ct.includes('text/html')) {
-            const html = await res.text();
-            console.error('[TRPC] HTML Response received:', html.substring(0, 200));
-            throw new TRPCClientError(
-              `[HTML_RESPONSE] Expected JSON but received HTML: ${res.status} ${res.statusText}. Check if tRPC server is running at ${url}`
-            );
-          }
-          return res;
-        }).catch((error) => {
-          console.error('[TRPC] Fetch error:', error);
-          throw error;
-        });
+        console.log('[TRPC] Making request to:', url);
+        
+        return fetch(url, opts)
+          .then(async (res) => {
+            console.log('[TRPC] Response status:', res.status, res.statusText);
+            console.log('[TRPC] Response headers:', Object.fromEntries(res.headers.entries()));
+            
+            const ct = res.headers.get('content-type') || '';
+            
+            // Check if we got HTML instead of JSON
+            if (ct.includes('text/html')) {
+              const html = await res.text();
+              console.error('[TRPC] HTML Response received:', html.substring(0, 200));
+              
+              // Provide helpful error message based on the HTML content
+              let errorMessage = `[HTML_RESPONSE] Expected JSON but received HTML: ${res.status} ${res.statusText}`;
+              
+              if (html.includes('Cannot GET')) {
+                errorMessage += '. The tRPC endpoint may not be properly configured or the server is not running.';
+              } else if (html.includes('<!DOCTYPE html>')) {
+                errorMessage += '. The server is returning a web page instead of API responses. Check if the backend is running and accessible.';
+              }
+              
+              errorMessage += ` Check if tRPC server is running at ${url}`;
+              
+              throw new TRPCClientError(errorMessage);
+            }
+            
+            // Check for other non-JSON responses
+            if (!ct.includes('application/json') && res.status !== 204) {
+              const text = await res.text();
+              console.error('[TRPC] Non-JSON response:', text.substring(0, 200));
+              throw new TRPCClientError(
+                `[NON_JSON_RESPONSE] Expected JSON but received ${ct}: ${res.status} ${res.statusText}`
+              );
+            }
+            
+            return res;
+          })
+          .catch((error) => {
+            console.error('[TRPC] Fetch error:', error);
+            
+            // Enhance network errors with helpful messages
+            if (error.name === 'TypeError' && error.message.includes('fetch')) {
+              throw new TRPCClientError(
+                `[NETWORK_ERROR] Cannot connect to tRPC server at ${url}. ` +
+                'Check if the backend server is running and accessible. ' +
+                'For mobile devices, ensure you\'re using the correct LAN IP address. ' +
+                `Original error: ${error.message}`
+              );
+            }
+            
+            throw error;
+          });
       },
     }),
   ],

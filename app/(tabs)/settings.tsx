@@ -1007,6 +1007,36 @@ export default function SettingsScreen() {
           }
         </View>
 
+        {/* Backend Connection Test Section */}
+        <SectionHeader 
+          title="Backend Connection" 
+          icon={<Wifi size={20} color={theme.colors.white} />} 
+        />
+        <View style={styles.section}>
+          <SettingItem
+            title="Test Backend Connection"
+            subtitle="Check if the backend server is accessible"
+            onPress={async () => {
+              try {
+                const result = await testBackendConnection();
+                Alert.alert(
+                  result.success ? "Connection Success" : "Connection Failed",
+                  result.message,
+                  [{ text: "OK" }]
+                );
+              } catch (error) {
+                Alert.alert("Connection Error", normalizeError(error));
+              }
+            }}
+            rightElement={<Activity size={16} color={theme.colors.gray[400]} />}
+          />
+          <SettingItem
+            title="tRPC URL"
+            subtitle="Current tRPC endpoint configuration"
+            value={process.env.EXPO_PUBLIC_TRPC_URL || "Not configured"}
+          />
+        </View>
+
         {/* Posting Rules Section */}
         <SectionHeader title="Posting Rules" icon={<Clock size={20} color={theme.colors.white} />} />
         <View style={styles.section}>
