@@ -475,21 +475,21 @@ function getTrpcUrl() {
     return explicitTrpcUrl.replace(/\/$/, '');
   }
 
-  // Check for API base URL and append /api/trpc
+  // Check for API base URL and append /trpc (not /api/trpc)
   const apiUrl = process.env.EXPO_PUBLIC_API_URL;
   if (apiUrl) {
     const baseUrl = apiUrl.replace(/\/$/, '');
-    return baseUrl.endsWith('/api/trpc') ? baseUrl : `${baseUrl}/api/trpc`;
+    return baseUrl.endsWith('/trpc') ? baseUrl : `${baseUrl}/trpc`;
   }
 
   // Web fallback: same origin
   if (typeof window !== 'undefined') {
-    return '/api/trpc';
+    return '/trpc';
   }
 
   // Native fallback: Use LAN IP for real device testing
   // Change this to your actual LAN IP address
-  return 'http://192.168.1.100:8081/api/trpc';
+  return 'http://192.168.1.100:8081/trpc';
 }
 
 // Log the tRPC URL for debugging
@@ -498,8 +498,8 @@ console.log('[TRPC] Using URL:', getTrpcUrl());
 // Test function to check backend connectivity
 export const testBackendConnection = async (): Promise<{ success: boolean; message: string; details?: any }> => {
   try {
-    const baseUrl = getTrpcUrl().replace('/api/trpc', '');
-    const healthUrl = `${baseUrl}/api/health`;
+    const baseUrl = getTrpcUrl().replace('/trpc', '');
+    const healthUrl = `${baseUrl}/health`;
     
     console.log('[tRPC] Testing backend connection to:', healthUrl);
     
