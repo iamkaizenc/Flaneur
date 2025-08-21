@@ -510,8 +510,20 @@ export default function SettingsScreen() {
           errorMessage = "Cannot connect to server. Please check your internet connection and try again.";
         } else if (error.message.includes('Backend server may not be running')) {
           errorMessage = "Backend server is not available. Please try again later.";
+        } else if (error.message.includes('Unexpected token')) {
+          errorMessage = "Backend server is not responding correctly. Please try again later.";
         } else {
           errorMessage = error.message;
+        }
+      } else if (typeof error === 'object' && error !== null) {
+        // Handle tRPC error objects
+        const trpcError = error as any;
+        if (trpcError.message) {
+          errorMessage = trpcError.message;
+        } else if (trpcError.data?.message) {
+          errorMessage = trpcError.data.message;
+        } else {
+          errorMessage = "An unexpected error occurred. Please try again.";
         }
       }
       
@@ -592,8 +604,20 @@ export default function SettingsScreen() {
           errorMessage = "Cannot connect to server. Please check your internet connection and try again.";
         } else if (error.message.includes('Backend server may not be running')) {
           errorMessage = "Backend server is not available. Please try again later.";
+        } else if (error.message.includes('Unexpected token')) {
+          errorMessage = "Backend server is not responding correctly. Please try again later.";
         } else {
           errorMessage = error.message;
+        }
+      } else if (typeof error === 'object' && error !== null) {
+        // Handle tRPC error objects
+        const trpcError = error as any;
+        if (trpcError.message) {
+          errorMessage = trpcError.message;
+        } else if (trpcError.data?.message) {
+          errorMessage = trpcError.data.message;
+        } else {
+          errorMessage = "An unexpected error occurred. Please try again.";
         }
       }
       

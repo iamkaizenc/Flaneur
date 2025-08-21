@@ -537,6 +537,38 @@ export const testBackendConnection = async (): Promise<{ success: boolean; messa
 
 
 
+// Create a fallback link that returns mock data when the server is unavailable
+const createFallbackLink = () => {
+  return {
+    request: (op: any) => {
+      return new Promise((resolve) => {
+        // Extract the procedure path from the operation
+        const path = op.path;
+        console.log('[tRPC] Fallback mode - returning mock data for:', path);
+        
+        // Get mock data for this path
+        const mockData = getFallbackData(path);
+        
+        if (mockData) {
+          resolve({
+            result: {
+              data: mockData
+            }
+          });
+        } else {
+          // Return a generic error for unknown paths
+          resolve({
+            error: {
+              message: `No mock data available for ${path}`,
+              code: 'MOCK_DATA_NOT_FOUND'
+            }
+          });
+        }
+      });
+    }
+  };
+};
+
 export const trpcClient = trpc.createClient({
   links: [
     httpLink({
@@ -577,7 +609,7 @@ export const trpcClient = trpc.createClient({
               console.error('[tRPC] 4. Request is being intercepted by a proxy or tunnel');
               
               // Throw a proper error that React Query can handle
-              const error = new Error('Server returned HTML instead of JSON - Backend server may not be running');
+              const error = new Error('Backend server is not responding correctly. Please try again later.');
               error.name = 'NetworkError';
               throw error;
             }
@@ -604,7 +636,7 @@ export const trpcClient = trpc.createClient({
           // For development, provide helpful error messages
           if (error instanceof TypeError && error.message.includes('Failed to fetch')) {
             console.error('[tRPC] Network error - make sure the development server is running');
-            const networkError = new Error('Cannot connect to API server - Backend may not be running');
+            const networkError = new Error('Cannot connect to server. Please check your internet connection and try again.');
             networkError.name = 'NetworkError';
             throw networkError;
           }
@@ -615,7 +647,7 @@ export const trpcClient = trpc.createClient({
           }
           
           // Fallback for unknown errors
-          const unknownError = new Error('Unknown network error occurred');
+          const unknownError = new Error('An unexpected error occurred. Please try again.');
           unknownError.name = 'UnknownError';
           throw unknownError;
         }
