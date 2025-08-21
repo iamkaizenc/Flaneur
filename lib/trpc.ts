@@ -475,21 +475,22 @@ function getTrpcUrl() {
     return explicitTrpcUrl.replace(/\/$/, '');
   }
 
-  // Check for API base URL and append /trpc (not /api/trpc)
+  // Check for API base URL and append /api/trpc (backend is mounted at /api)
   const apiUrl = process.env.EXPO_PUBLIC_API_URL;
   if (apiUrl) {
     const baseUrl = apiUrl.replace(/\/$/, '');
-    return baseUrl.endsWith('/trpc') ? baseUrl : `${baseUrl}/trpc`;
+    // Backend is mounted at /api, so tRPC is at /api/trpc
+    return baseUrl.endsWith('/trpc') ? baseUrl : `${baseUrl}/api/trpc`;
   }
 
-  // Web fallback: same origin
+  // Web fallback: same origin with /api/trpc path
   if (typeof window !== 'undefined') {
-    return '/trpc';
+    return '/api/trpc';
   }
 
   // Native fallback: Use LAN IP for real device testing
   // Change this to your actual LAN IP address
-  return 'http://192.168.1.100:8081/trpc';
+  return 'http://192.168.1.100:8081/api/trpc';
 }
 
 // Log the tRPC URL for debugging
