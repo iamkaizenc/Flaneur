@@ -11,11 +11,11 @@ To fix the tRPC connection errors, you need to start the backend server:
 bun run backend/server.ts
 ```
 
-The server will start on port 8081 and you should see:
+The server will start on port 8787 and you should see:
 ```
-[Server] ✅ Flâneur API is running on http://localhost:8081
-[Server] Health check: http://localhost:8081/api/health
-[Server] tRPC endpoint: http://localhost:8081/api/trpc
+[Server] ✅ Flâneur API is running on http://localhost:8787
+[Server] Health check: http://localhost:8787/api/health
+[Server] tRPC endpoint: http://localhost:8787/api/trpc
 ```
 
 ### 2. Start the Expo App

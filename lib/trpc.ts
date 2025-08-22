@@ -516,15 +516,27 @@ function getTrpcUrl() {
     return trpcUrl;
   }
 
-  // Web fallback: same origin with /api/trpc path
+  // Web fallback: Check if we're in development and use the backend server
   if (typeof window !== 'undefined') {
-    console.log('[TRPC] Using web fallback: /api/trpc');
-    return '/api/trpc';
+    // In web development, the backend runs on a different port (8081)
+    // while the Expo dev server runs on 8081 but serves the web app
+    // We need to connect to the backend server directly
+    const isDev = process.env.NODE_ENV === 'development' || __DEV__;
+    if (isDev) {
+      // Try to determine the backend URL from the current location
+      const currentHost = window.location.hostname;
+      const backendUrl = `http://${currentHost}:8787/api/trpc`;
+      console.log('[TRPC] Using web development backend URL:', backendUrl);
+      return backendUrl;
+    } else {
+      console.log('[TRPC] Using web production fallback: /api/trpc');
+      return '/api/trpc';
+    }
   }
 
   // Native fallback: Use localhost for development
   // For real device testing, change this to your LAN IP address
-  const fallbackUrl = 'http://localhost:8081/api/trpc';
+  const fallbackUrl = 'http://localhost:8787/api/trpc';
   console.log('[TRPC] Using native fallback:', fallbackUrl);
   return fallbackUrl;
 }
