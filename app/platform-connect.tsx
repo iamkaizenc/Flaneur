@@ -25,6 +25,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { useAIMarketer } from "@/providers/AIMarketerProvider";
 import { theme } from "@/constants/theme";
 import { trpc } from "@/lib/trpc";
+import { normalizeError } from "@/lib/errors";
 
 interface PlatformCardProps {
   name: string;
@@ -72,19 +73,7 @@ export default function PlatformConnectScreen() {
   const [loadingPlatforms, setLoadingPlatforms] = useState<Set<string>>(new Set());
   const [isLiveMode, setIsLiveMode] = useState<boolean>(false);
   
-  // Helper function to normalize error messages
-  const normalizeError = (err: unknown): string => {
-    if (typeof err === "string") return err;
-    if (err && typeof err === "object") {
-      const anyErr = err as any;
-      if (anyErr.message) return String(anyErr.message);
-      if (anyErr.data?.code || anyErr.data?.message) {
-        return `${anyErr.data.code ?? "ERR"}: ${anyErr.data.message ?? "Unknown error"}`;
-      }
-      try { return JSON.stringify(anyErr); } catch { /* noop */ }
-    }
-    return "Unknown error";
-  };
+
 
   // Check if we're in LIVE mode
   useEffect(() => {

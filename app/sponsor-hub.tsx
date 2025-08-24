@@ -166,10 +166,13 @@ const TipCard: React.FC<TipCardProps> = ({ tip }) => (
 export default function SponsorHubScreen() {
   const router = useRouter();
   const sponsorQuery = trpc.sponsors.hub.useQuery({ userId: "user-1" });
+  const plansQuery = trpc.plans.getCurrent.useQuery();
 
-  // Mock user plan - in real app this would come from auth/user context
-  const userPlan = "premium"; // "free" | "premium" | "platinum"
+  // Dynamic plan checking from backend
+  const userPlan = plansQuery.data?.plan || "free";
   const hasAccess = userPlan === "premium" || userPlan === "platinum";
+  
+  console.log('[Sponsor Hub] User plan:', userPlan, 'Has access:', hasAccess);
 
   if (!hasAccess) {
     return (

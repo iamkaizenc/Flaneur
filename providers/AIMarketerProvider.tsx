@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import createContextHook from "@nkzw/create-context-hook";
+import { trpc } from "@/lib/trpc";
 
 interface ContentItem {
   id: string;
@@ -72,19 +73,53 @@ export const [AIMarketerProvider, useAIMarketer] = createContextHook<AIMarketerC
     riskLevel: "Normal"
   });
 
+  // Sync connected platforms with backend on app startup
+  const oauthAccountsQuery = trpc.oauth.listAccounts.useQuery(undefined, {
+    refetchOnMount: true,
+    refetchOnWindowFocus: false,
+    staleTime: 1000 * 60 * 5, // 5 minutes
+  });
+
   const loadSavedData = useCallback(async () => {
     try {
       const savedPrompts = await AsyncStorage.getItem("coursePrompts");
-      const savedPlatforms = await AsyncStorage.getItem("connectedPlatforms");
       const savedSettings = await AsyncStorage.getItem("settings");
       
       if (savedPrompts) setCoursePrompts(JSON.parse(savedPrompts));
-      if (savedPlatforms) setConnectedPlatforms(JSON.parse(savedPlatforms));
       if (savedSettings) setSettings(JSON.parse(savedSettings));
+      
+      // Don't load connected platforms from AsyncStorage anymore - use backend as source of truth
+      console.log('[AIMarketer] Loaded saved data from AsyncStorage');
     } catch (error) {
-      console.error("Error loading saved data:", error);
+      console.error("[AIMarketer] Error loading saved data:", error);
     }
   }, []);
+
+  // Sync connected platforms with backend data
+  useEffect(() => {
+    if (oauthAccountsQuery.data?.accounts) {
+      const backendPlatforms = oauthAccountsQuery.data.accounts
+        .filter(account => account.status === 'connected')
+        .map(account => {
+          // Map platform keys to display names
+          const platformMap: Record<string, string> = {
+            'x': 'X (Twitter)',
+            'instagram': 'Instagram',
+            'linkedin': 'LinkedIn',
+            'telegram': 'Telegram',
+            'facebook': 'Facebook',
+            'tiktok': 'TikTok'
+          };
+          return platformMap[account.platform] || account.platform;
+        });
+      
+      console.log('[AIMarketer] Syncing connected platforms from backend:', backendPlatforms);
+      setConnectedPlatforms(backendPlatforms);
+      
+      // Update AsyncStorage cache
+      AsyncStorage.setItem("connectedPlatforms", JSON.stringify(backendPlatforms));
+    }
+  }, [oauthAccountsQuery.data]);
 
   const addCoursePrompt = useCallback(async (prompt: string) => {
     setCoursePrompts(prev => {
@@ -115,11 +150,16 @@ export const [AIMarketerProvider, useAIMarketer] = createContextHook<AIMarketerC
       if (!prev.includes(platform)) {
         const updated = [...prev, platform];
         AsyncStorage.setItem("connectedPlatforms", JSON.stringify(updated));
+        console.log('[AIMarketer] Connected platform:', platform);
+        
+        // Refetch backend accounts to stay in sync
+        oauthAccountsQuery.refetch();
+        
         return updated;
       }
       return prev;
     });
-  }, []);
+  }, [oauthAccountsQuery]);
 
   useEffect(() => {
     loadSavedData();

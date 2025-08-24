@@ -499,24 +499,33 @@ export const mockFallbacks = {
 export const trpc = createTRPCReact<AppRouter>();
 
 function getTrpcUrl() {
-  // Priority order:
+  // Priority order for tRPC URL resolution:
   // 1. EXPO_PUBLIC_TRPC_URL (explicit tRPC URL)
-  // 2. EXPO_PUBLIC_API_URL + /api/trpc
-  // 3. Platform-specific fallbacks
+  // 2. NEXT_PUBLIC_TRPC_URL (Next.js compatibility)
+  // 3. EXPO_PUBLIC_API_URL (if ends with /trpc)
+  // 4. Platform-specific fallbacks
   
   const explicitTrpcUrl = process.env.EXPO_PUBLIC_TRPC_URL;
   if (explicitTrpcUrl) {
     const url = explicitTrpcUrl.replace(/\/$/, '');
-    console.log('[TRPC] Using explicit tRPC URL:', url);
+    console.log('[TRPC] Using EXPO_PUBLIC_TRPC_URL:', url);
+    return url;
+  }
+
+  const nextTrpcUrl = process.env.NEXT_PUBLIC_TRPC_URL;
+  if (nextTrpcUrl) {
+    const url = nextTrpcUrl.replace(/\/$/, '');
+    console.log('[TRPC] Using NEXT_PUBLIC_TRPC_URL:', url);
     return url;
   }
 
   const apiUrl = process.env.EXPO_PUBLIC_API_URL;
   if (apiUrl) {
     const baseUrl = apiUrl.replace(/\/$/, '');
-    const trpcUrl = baseUrl.endsWith('/trpc') ? baseUrl : `${baseUrl}/api/trpc`;
-    console.log('[TRPC] Using API URL with /api/trpc:', trpcUrl);
-    return trpcUrl;
+    if (baseUrl.endsWith('/trpc')) {
+      console.log('[TRPC] Using EXPO_PUBLIC_API_URL (ends with /trpc):', baseUrl);
+      return baseUrl;
+    }
   }
 
   // Platform-specific fallbacks
@@ -524,18 +533,19 @@ function getTrpcUrl() {
     // Web platform
     const isDev = process.env.NODE_ENV === 'development' || __DEV__;
     if (isDev) {
-      const currentHost = window.location.hostname;
-      const backendUrl = `http://${currentHost}:8787/api/trpc`;
-      console.log('[TRPC] Using web development backend URL:', backendUrl);
-      return backendUrl;
+      const fallbackUrl = '/api/trpc';
+      console.log('[TRPC] Using web development fallback:', fallbackUrl);
+      return fallbackUrl;
     } else {
       console.log('[TRPC] Using web production fallback: /api/trpc');
       return '/api/trpc';
     }
   } else {
-    // Native platform - use localhost for simulator, LAN IP for real device
-    const fallbackUrl = 'http://localhost:8787/api/trpc';
-    console.log('[TRPC] Using native fallback (change to LAN IP for real device):', fallbackUrl);
+    // Native platform - use LAN IP for real device testing
+    // Change this to your computer's LAN IP when testing on real device
+    const lanIp = '192.168.1.100'; // Update this to your actual LAN IP
+    const fallbackUrl = `http://${lanIp}:8787/api/trpc`;
+    console.log('[TRPC] Using native fallback (update LAN IP for real device):', fallbackUrl);
     return fallbackUrl;
   }
 }

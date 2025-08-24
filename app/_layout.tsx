@@ -188,6 +188,18 @@ function RootLayoutNav() {
         title: "Content Details",
         presentation: "modal" 
       }} />
+      <Stack.Screen name="oauth-callback" options={{ 
+        headerShown: false,
+        presentation: "modal" 
+      }} />
+      <Stack.Screen name="sponsor-hub" options={{ 
+        headerShown: false,
+        presentation: "modal" 
+      }} />
+      <Stack.Screen name="e2e-test" options={{ 
+        title: "E2E Test",
+        presentation: "modal" 
+      }} />
     </Stack>
   );
 }
