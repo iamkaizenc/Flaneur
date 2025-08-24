@@ -499,31 +499,31 @@ export const mockFallbacks = {
 export const trpc = createTRPCReact<AppRouter>();
 
 function getTrpcUrl() {
-  // Check for explicit tRPC URL first
+  // Priority order:
+  // 1. EXPO_PUBLIC_TRPC_URL (explicit tRPC URL)
+  // 2. EXPO_PUBLIC_API_URL + /api/trpc
+  // 3. Platform-specific fallbacks
+  
   const explicitTrpcUrl = process.env.EXPO_PUBLIC_TRPC_URL;
   if (explicitTrpcUrl) {
-    console.log('[TRPC] Using explicit tRPC URL:', explicitTrpcUrl);
-    return explicitTrpcUrl.replace(/\/$/, '');
+    const url = explicitTrpcUrl.replace(/\/$/, '');
+    console.log('[TRPC] Using explicit tRPC URL:', url);
+    return url;
   }
 
-  // Check for API base URL and append /api/trpc (backend is mounted at /api)
   const apiUrl = process.env.EXPO_PUBLIC_API_URL;
   if (apiUrl) {
     const baseUrl = apiUrl.replace(/\/$/, '');
-    // Backend is mounted at /api, so tRPC is at /api/trpc
     const trpcUrl = baseUrl.endsWith('/trpc') ? baseUrl : `${baseUrl}/api/trpc`;
     console.log('[TRPC] Using API URL with /api/trpc:', trpcUrl);
     return trpcUrl;
   }
 
-  // Web fallback: Check if we're in development and use the backend server
+  // Platform-specific fallbacks
   if (typeof window !== 'undefined') {
-    // In web development, the backend runs on a different port (8081)
-    // while the Expo dev server runs on 8081 but serves the web app
-    // We need to connect to the backend server directly
+    // Web platform
     const isDev = process.env.NODE_ENV === 'development' || __DEV__;
     if (isDev) {
-      // Try to determine the backend URL from the current location
       const currentHost = window.location.hostname;
       const backendUrl = `http://${currentHost}:8787/api/trpc`;
       console.log('[TRPC] Using web development backend URL:', backendUrl);
@@ -532,13 +532,12 @@ function getTrpcUrl() {
       console.log('[TRPC] Using web production fallback: /api/trpc');
       return '/api/trpc';
     }
+  } else {
+    // Native platform - use localhost for simulator, LAN IP for real device
+    const fallbackUrl = 'http://localhost:8787/api/trpc';
+    console.log('[TRPC] Using native fallback (change to LAN IP for real device):', fallbackUrl);
+    return fallbackUrl;
   }
-
-  // Native fallback: Use localhost for development
-  // For real device testing, change this to your LAN IP address
-  const fallbackUrl = 'http://localhost:8787/api/trpc';
-  console.log('[TRPC] Using native fallback:', fallbackUrl);
-  return fallbackUrl;
 }
 
 // Log the tRPC URL for debugging
@@ -547,21 +546,27 @@ console.log('[TRPC] Using URL:', getTrpcUrl());
 // Test function to check backend connectivity
 export const testBackendConnection = async (): Promise<{ success: boolean; message: string; details?: any }> => {
   try {
-    const baseUrl = getTrpcUrl().replace('/api/trpc', '').replace('/trpc', '');
+    const trpcUrl = getTrpcUrl();
+    const baseUrl = trpcUrl.replace('/api/trpc', '').replace('/trpc', '');
     const healthUrl = `${baseUrl}/api/health`;
     
     console.log('[tRPC] Testing backend connection to:', healthUrl);
+    
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
     
     const response = await fetch(healthUrl, {
       method: 'GET',
       headers: {
         'Accept': 'application/json',
         'Content-Type': 'application/json'
-      }
+      },
+      signal: controller.signal
     });
     
+    clearTimeout(timeoutId);
+    
     console.log('[tRPC] Health check response status:', response.status);
-    console.log('[tRPC] Health check response headers:', Object.fromEntries(response.headers.entries()));
     
     if (!response.ok) {
       const text = await response.text();
@@ -570,6 +575,17 @@ export const testBackendConnection = async (): Promise<{ success: boolean; messa
         success: false,
         message: `Backend health check failed: ${response.status} ${response.statusText}`,
         details: { status: response.status, response: text.substring(0, 200) }
+      };
+    }
+    
+    const contentType = response.headers.get('content-type') || '';
+    if (!contentType.includes('application/json')) {
+      const text = await response.text();
+      console.error('[tRPC] Health check returned non-JSON:', text.substring(0, 200));
+      return {
+        success: false,
+        message: 'Backend returned non-JSON response',
+        details: { contentType, response: text.substring(0, 200) }
       };
     }
     
@@ -583,9 +599,21 @@ export const testBackendConnection = async (): Promise<{ success: boolean; messa
     };
   } catch (error) {
     console.error('[tRPC] Backend connection test failed:', error);
+    
+    let message = 'Cannot connect to backend';
+    if (error instanceof Error) {
+      if (error.name === 'AbortError') {
+        message = 'Backend connection timeout (5s)';
+      } else if (error.message.includes('fetch')) {
+        message = 'Network error - check if backend is running';
+      } else {
+        message = error.message;
+      }
+    }
+    
     return {
       success: false,
-      message: `Cannot connect to backend: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      message,
       details: { error: error instanceof Error ? error.message : String(error) }
     };
   }
@@ -684,7 +712,6 @@ export const trpcClient = trpc.createClient({
         return fetch(url, opts)
           .then(async (res) => {
             console.log('[TRPC] Response status:', res.status, res.statusText);
-            console.log('[TRPC] Response headers:', Object.fromEntries(res.headers.entries()));
             
             const ct = res.headers.get('content-type') || '';
             
@@ -707,9 +734,6 @@ export const trpcClient = trpc.createClient({
               }
               
               errorMessage += ` Check if tRPC server is running at ${url}`;
-              
-              // Add suggestion to use mock data
-              errorMessage += '\n\nTip: The app will continue to work with mock data while the backend is unavailable.';
               
               throw new TRPCClientError(errorMessage);
             }
