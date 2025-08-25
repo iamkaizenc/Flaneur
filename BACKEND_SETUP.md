@@ -50,7 +50,7 @@ bun start
 
 ## Verification
 
-1. **Check Backend Health**: Visit http://localhost:8081/api/health in your browser
+1. **Check Backend Health**: Visit http://localhost:8787/api/health in your browser
 2. **Check tRPC**: The app should now connect successfully without HTML errors
 
 ## For Mobile Device Testing
@@ -58,8 +58,8 @@ bun start
 If testing on a real mobile device, update the `.env` file:
 
 ```env
-EXPO_PUBLIC_API_URL=http://YOUR_LAN_IP:8081
-EXPO_PUBLIC_TRPC_URL=http://YOUR_LAN_IP:8081/api/trpc
+EXPO_PUBLIC_API_URL=http://YOUR_LAN_IP:8787
+EXPO_PUBLIC_TRPC_URL=http://YOUR_LAN_IP:8787/api/trpc
 ```
 
 Replace `YOUR_LAN_IP` with your computer's local IP address (e.g., `192.168.1.100`).
@@ -70,6 +70,6 @@ If the backend is not running, the app will automatically use mock data and show
 
 ## Troubleshooting
 
-- **Port 8081 in use**: Change the port in `backend/server.ts` and update the `.env` file
+- **Port 8787 in use**: Change the port in `backend/server.ts` and update the `.env` file
 - **CORS errors**: The server is configured to allow requests from Expo development servers
 - **Connection refused**: Make sure the backend server is running before starting the Expo app

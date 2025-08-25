@@ -34,7 +34,7 @@ export function BackendStatusIndicator({ style, showDetails = false }: BackendSt
           styles.statusText,
           { color: isBackendAvailable ? theme.colors.success : theme.colors.warning }
         ]}>
-          {isBackendAvailable ? 'Connected' : 'Offline Mode'}
+          {isBackendAvailable ? 'Backend Connected' : 'Backend Offline - Using Demo Data'}
         </Text>
         
         {!isBackendAvailable && (

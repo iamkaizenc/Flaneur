@@ -5,6 +5,12 @@ import apiApp from "./hono";
 
 const port = parseInt(process.env.PORT || "8787");
 
+// Validate port
+if (isNaN(port) || port < 1 || port > 65535) {
+  console.error(`[Server] Invalid port: ${process.env.PORT}. Using default 8787`);
+  process.exit(1);
+}
+
 // Ensure we're using the correct port from environment
 console.log(`[Server] Port configuration: ${port}`);
 console.log(`[Server] Environment variables:`);
