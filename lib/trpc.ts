@@ -564,7 +564,7 @@ export const testBackendConnection = async (): Promise<{ success: boolean; messa
     console.log('[tRPC] Testing backend connection to:', healthUrl);
     
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
+    const timeoutId = setTimeout(() => controller.abort(), 3000); // 3 second timeout (faster)
     
     const response = await fetch(healthUrl, {
       method: 'GET',
@@ -614,9 +614,9 @@ export const testBackendConnection = async (): Promise<{ success: boolean; messa
     let message = 'Cannot connect to backend';
     if (error instanceof Error) {
       if (error.name === 'AbortError') {
-        message = 'Backend connection timeout (5s)';
-      } else if (error.message.includes('fetch')) {
-        message = 'Network error - check if backend is running';
+        message = 'Backend connection timeout (3s)';
+      } else if (error.message.includes('fetch') || error.message.includes('Failed to fetch')) {
+        message = 'Network error - backend server not running';
       } else {
         message = error.message;
       }
@@ -667,15 +667,6 @@ export const testBackendConnection = async (): Promise<{ success: boolean; messa
 // };
 
 // Enhanced fallback system with better error handling
-let backendAvailable = false;
-let lastBackendCheck = 0;
-const BACKEND_CHECK_INTERVAL = 30000; // 30 seconds
-
-// Check if we should test backend availability
-function shouldTestBackend(): boolean {
-  const now = Date.now();
-  return now - lastBackendCheck > BACKEND_CHECK_INTERVAL;
-}
 
 // Quick backend availability test (removed unused function warning)
 // async function quickBackendTest(): Promise<boolean> {
@@ -711,6 +702,10 @@ function shouldTestBackend(): boolean {
 //   }
 // }
 
+// Create a fallback-aware tRPC client
+let isBackendDown = false;
+let backendDownSince: number | null = null;
+
 export const trpcClient = trpc.createClient({
   links: [
     httpBatchLink({
@@ -731,9 +726,20 @@ export const trpcClient = trpc.createClient({
               const html = await res.text();
               console.error('[TRPC] HTML Response received:', html.substring(0, 200));
               
-              // Mark backend as unavailable
-              backendAvailable = false;
-              lastBackendCheck = Date.now();
+              if (!isBackendDown) {
+                isBackendDown = true;
+                backendDownSince = Date.now();
+                
+                // Show helpful instructions only once
+                console.error('\n🚨 BACKEND SERVER NOT RUNNING!');
+                console.error('To start the backend server:');
+                console.error('1. Open a new terminal in your project directory');
+                console.error('2. Run: bun run backend/server.ts');
+                console.error('3. Or use: ./start-backend.sh (macOS/Linux)');
+                console.error('4. Wait for "✅ Flâneur API is running" message');
+                console.error('5. The app will automatically reconnect');
+                console.error('\n💡 The app will continue working with demo data\n');
+              }
               
               // Provide helpful error message based on the HTML content
               let errorMessage = `[HTML_RESPONSE] Expected JSON but received HTML: ${res.status} ${res.statusText}`;
@@ -745,16 +751,6 @@ export const trpcClient = trpc.createClient({
               }
               
               errorMessage += ` Check if tRPC server is running at ${url}`;
-              
-              // Add helpful instructions
-              console.error('\n🚨 BACKEND SERVER NOT RUNNING!');
-              console.error('To fix this error:');
-              console.error('1. Open a new terminal');
-              console.error('2. Run: bun run backend/server.ts');
-              console.error('3. Or use: ./start-backend.sh (macOS/Linux) or start-backend.bat (Windows)');
-              console.error('4. Wait for "✅ Flâneur API is running" message');
-              console.error('5. Refresh your app');
-              console.error('\n💡 Alternative: The app will work in offline mode with demo data\n');
               
               throw new TRPCClientError(errorMessage);
             }
@@ -769,23 +765,37 @@ export const trpcClient = trpc.createClient({
             }
             
             // Mark backend as available if we get here
-            backendAvailable = true;
-            lastBackendCheck = Date.now();
+            if (isBackendDown) {
+              isBackendDown = false;
+              backendDownSince = null;
+              console.log('✅ Backend server is back online!');
+            }
             return res;
           })
           .catch((error) => {
             console.error('[TRPC] Fetch error:', error);
             
-            // Mark backend as unavailable
-            backendAvailable = false;
-            lastBackendCheck = Date.now();
+            if (!isBackendDown) {
+              isBackendDown = true;
+              backendDownSince = Date.now();
+              
+              // Show helpful instructions only once
+              console.error('\n🚨 BACKEND SERVER CONNECTION FAILED!');
+              console.error('To start the backend server:');
+              console.error('1. Open a new terminal in your project directory');
+              console.error('2. Run: bun run backend/server.ts');
+              console.error('3. Or use: ./start-backend.sh (macOS/Linux)');
+              console.error('4. Wait for "✅ Flâneur API is running" message');
+              console.error('5. The app will automatically reconnect');
+              console.error('\n💡 The app will continue working with demo data\n');
+            }
             
             // Enhance network errors with helpful messages
             if (error.name === 'TypeError' && error.message.includes('fetch')) {
               throw new TRPCClientError(
                 `[NETWORK_ERROR] Cannot connect to tRPC server at ${url}. ` +
-                'Check if the backend server is running and accessible. ' +
-                'For mobile devices, ensure you\'re using the correct LAN IP address. ' +
+                'Backend server is not running or not accessible. ' +
+                'The app will use demo data until the backend is available. ' +
                 `Original error: ${error.message}`
               );
             }
@@ -799,5 +809,18 @@ export const trpcClient = trpc.createClient({
 
 // Helper function to get fallback data for a specific query
 export const getFallbackData = (queryKey: string) => {
-  return mockFallbacks[queryKey as keyof typeof mockFallbacks] || null;
+  const fallbackData = mockFallbacks[queryKey as keyof typeof mockFallbacks] || null;
+  if (fallbackData) {
+    console.log(`[TRPC] Using fallback data for: ${queryKey}`);
+  }
+  return fallbackData;
+};
+
+// Helper function to check if backend is currently down
+export const isBackendCurrentlyDown = () => isBackendDown;
+
+// Helper function to get how long backend has been down
+export const getBackendDowntime = () => {
+  if (!isBackendDown || !backendDownSince) return 0;
+  return Date.now() - backendDownSince;
 };
