@@ -5,6 +5,14 @@ import apiApp from "./hono";
 
 const port = parseInt(process.env.PORT || "8787");
 
+// Ensure we're using the correct port from environment
+console.log(`[Server] Port configuration: ${port}`);
+console.log(`[Server] Environment variables:`);
+console.log(`  - PORT: ${process.env.PORT}`);
+console.log(`  - NODE_ENV: ${process.env.NODE_ENV}`);
+console.log(`  - DRY_RUN: ${process.env.DRY_RUN}`);
+console.log(`  - LIVE_MODE: ${process.env.LIVE_MODE}`);
+
 // Create main app and mount API at /api
 const app = new Hono();
 

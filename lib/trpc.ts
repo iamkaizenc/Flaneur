@@ -746,6 +746,15 @@ export const trpcClient = trpc.createClient({
               
               errorMessage += ` Check if tRPC server is running at ${url}`;
               
+              // Add helpful instructions
+              console.error('\n🚨 BACKEND SERVER NOT RUNNING!');
+              console.error('To fix this error:');
+              console.error('1. Open a new terminal');
+              console.error('2. Run: bun run backend/server.ts');
+              console.error('3. Or use: ./start-backend.sh (macOS/Linux) or start-backend.bat (Windows)');
+              console.error('4. Wait for "✅ Flâneur API is running" message');
+              console.error('5. Refresh your app\n');
+              
               throw new TRPCClientError(errorMessage);
             }
             
