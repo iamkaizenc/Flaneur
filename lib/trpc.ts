@@ -502,7 +502,7 @@ function getTrpcUrl() {
   // Priority order for tRPC URL resolution:
   // 1. EXPO_PUBLIC_TRPC_URL (explicit tRPC URL)
   // 2. NEXT_PUBLIC_TRPC_URL (Next.js compatibility)
-  // 3. EXPO_PUBLIC_API_URL (if ends with /trpc)
+  // 3. EXPO_PUBLIC_API_URL + /api/trpc
   // 4. Platform-specific fallbacks
   
   const explicitTrpcUrl = process.env.EXPO_PUBLIC_TRPC_URL;
@@ -522,31 +522,32 @@ function getTrpcUrl() {
   const apiUrl = process.env.EXPO_PUBLIC_API_URL;
   if (apiUrl) {
     const baseUrl = apiUrl.replace(/\/$/, '');
-    if (baseUrl.endsWith('/trpc')) {
-      console.log('[TRPC] Using EXPO_PUBLIC_API_URL (ends with /trpc):', baseUrl);
-      return baseUrl;
-    }
+    const trpcUrl = `${baseUrl}/api/trpc`;
+    console.log('[TRPC] Using EXPO_PUBLIC_API_URL + /api/trpc:', trpcUrl);
+    return trpcUrl;
   }
 
   // Platform-specific fallbacks
   if (typeof window !== 'undefined') {
-    // Web platform
+    // Web platform - proxy through Expo dev server
+    const fallbackUrl = '/api/trpc';
+    console.log('[TRPC] Using web fallback (proxied):', fallbackUrl);
+    return fallbackUrl;
+  } else {
+    // Native platform - connect directly to backend server
+    // Use localhost for simulator, LAN IP for real device
     const isDev = process.env.NODE_ENV === 'development' || __DEV__;
     if (isDev) {
-      const fallbackUrl = '/api/trpc';
-      console.log('[TRPC] Using web development fallback:', fallbackUrl);
+      // For development, try localhost first (simulator)
+      const fallbackUrl = 'http://localhost:8787/api/trpc';
+      console.log('[TRPC] Using native development fallback:', fallbackUrl);
       return fallbackUrl;
     } else {
-      console.log('[TRPC] Using web production fallback: /api/trpc');
-      return '/api/trpc';
+      // For production, would use actual server URL
+      const fallbackUrl = 'http://localhost:8787/api/trpc';
+      console.log('[TRPC] Using native production fallback:', fallbackUrl);
+      return fallbackUrl;
     }
-  } else {
-    // Native platform - use LAN IP for real device testing
-    // Change this to your computer's LAN IP when testing on real device
-    const lanIp = '192.168.1.100'; // Update this to your actual LAN IP
-    const fallbackUrl = `http://${lanIp}:8787/api/trpc`;
-    console.log('[TRPC] Using native fallback (update LAN IP for real device):', fallbackUrl);
-    return fallbackUrl;
   }
 }
 
@@ -676,39 +677,39 @@ function shouldTestBackend(): boolean {
   return now - lastBackendCheck > BACKEND_CHECK_INTERVAL;
 }
 
-// Quick backend availability test
-async function quickBackendTest(): Promise<boolean> {
-  if (!shouldTestBackend()) {
-    return backendAvailable;
-  }
-  
-  try {
-    const baseUrl = getTrpcUrl().replace('/api/trpc', '').replace('/trpc', '');
-    const healthUrl = `${baseUrl}/api/health`;
-    
-    const response = await fetch(healthUrl, {
-      method: 'GET',
-      headers: { 'Accept': 'application/json' },
-      signal: AbortSignal.timeout(5000) // 5 second timeout
-    });
-    
-    backendAvailable = response.ok;
-    lastBackendCheck = Date.now();
-    
-    if (backendAvailable) {
-      console.log('[TRPC] Backend is available');
-    } else {
-      console.warn('[TRPC] Backend health check failed:', response.status);
-    }
-    
-    return backendAvailable;
-  } catch (error) {
-    console.warn('[TRPC] Backend availability test failed:', error);
-    backendAvailable = false;
-    lastBackendCheck = Date.now();
-    return false;
-  }
-}
+// Quick backend availability test (removed unused function warning)
+// async function quickBackendTest(): Promise<boolean> {
+//   if (!shouldTestBackend()) {
+//     return backendAvailable;
+//   }
+//   
+//   try {
+//     const baseUrl = getTrpcUrl().replace('/api/trpc', '').replace('/trpc', '');
+//     const healthUrl = `${baseUrl}/api/health`;
+//     
+//     const response = await fetch(healthUrl, {
+//       method: 'GET',
+//       headers: { 'Accept': 'application/json' },
+//       signal: AbortSignal.timeout(5000) // 5 second timeout
+//     });
+//     
+//     backendAvailable = response.ok;
+//     lastBackendCheck = Date.now();
+//     
+//     if (backendAvailable) {
+//       console.log('[TRPC] Backend is available');
+//     } else {
+//       console.warn('[TRPC] Backend health check failed:', response.status);
+//     }
+//     
+//     return backendAvailable;
+//   } catch (error) {
+//     console.warn('[TRPC] Backend availability test failed:', error);
+//     backendAvailable = false;
+//     lastBackendCheck = Date.now();
+//     return false;
+//   }
+// }
 
 export const trpcClient = trpc.createClient({
   links: [
