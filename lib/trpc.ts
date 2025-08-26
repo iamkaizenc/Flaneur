@@ -516,7 +516,7 @@ class RestClient {
   
   constructor() {
     this.baseUrl = getRestApiUrl();
-    console.log('[REST] Using base URL:', this.baseUrl);
+    console.log('[REST] Using base URL:', this.baseUrl || 'null (demo mode)');
   }
   
   private async request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
@@ -949,28 +949,28 @@ function getTrpcUrl() {
   // 4. Platform-specific fallbacks
   
   const explicitTrpcUrl = process.env.EXPO_PUBLIC_TRPC_URL;
-  if (explicitTrpcUrl) {
+  if (explicitTrpcUrl && !explicitTrpcUrl.includes('.exp.direct')) {
     const url = explicitTrpcUrl.replace(/\/$/, '');
     console.log('[TRPC] Using EXPO_PUBLIC_TRPC_URL:', url);
     return url;
   }
 
   const nextTrpcUrl = process.env.NEXT_PUBLIC_TRPC_URL;
-  if (nextTrpcUrl) {
+  if (nextTrpcUrl && !nextTrpcUrl.includes('.exp.direct')) {
     const url = nextTrpcUrl.replace(/\/$/, '');
     console.log('[TRPC] Using NEXT_PUBLIC_TRPC_URL:', url);
     return url;
   }
 
   const apiUrl = process.env.EXPO_PUBLIC_API_URL;
-  if (apiUrl) {
+  if (apiUrl && !apiUrl.includes('.exp.direct')) {
     const baseUrl = apiUrl.replace(/\/$/, '');
     const trpcUrl = `${baseUrl}/api/trpc`;
     console.log('[TRPC] Using EXPO_PUBLIC_API_URL + /api/trpc:', trpcUrl);
     return trpcUrl;
   }
 
-  // Platform-specific fallbacks
+  // Platform-specific fallbacks - avoid ngrok/exp.direct URLs
   if (typeof window !== 'undefined') {
     // Web platform - proxy through Expo dev server
     const fallbackUrl = '/api/trpc';
@@ -1001,6 +1001,17 @@ console.log('[TRPC] Using URL:', getTrpcUrl());
 export const testBackendConnection = async (): Promise<{ success: boolean; message: string; details?: any }> => {
   try {
     const trpcUrl = getTrpcUrl();
+    
+    // Skip health check for ngrok/exp.direct URLs as they're unreliable
+    if (trpcUrl.includes('.exp.direct')) {
+      console.log('[tRPC] Skipping health check for ngrok URL:', trpcUrl);
+      return {
+        success: false,
+        message: 'Backend server not running - ngrok tunnel is offline. Start backend with: bun run backend/server.ts',
+        details: { url: trpcUrl, reason: 'ngrok_offline' }
+      };
+    }
+    
     const baseUrl = trpcUrl.replace('/api/trpc', '').replace('/trpc', '');
     const healthUrl = `${baseUrl}/api/health`;
     
@@ -1060,6 +1071,8 @@ export const testBackendConnection = async (): Promise<{ success: boolean; messa
         message = 'Backend connection timeout - server may not be running';
       } else if (error.message.includes('fetch') || error.message.includes('Failed to fetch')) {
         message = 'Backend server not running - start with: bun run backend/server.ts';
+      } else if (error.message.includes('ERR_NGROK')) {
+        message = 'Ngrok tunnel is offline - start backend with: bun run backend/server.ts';
       } else {
         message = error.message;
       }
@@ -1169,6 +1182,24 @@ export const trpcClient = trpc.createClient({
               const html = await res.text();
               console.error('[TRPC] HTML Response received:', html.substring(0, 200));
               
+              // Check for ngrok-specific errors
+              if (html.includes('ERR_NGROK_3200') || url.includes('.exp.direct')) {
+                if (!isBackendDown) {
+                  isBackendDown = true;
+                  backendDownSince = Date.now();
+                  
+                  console.error('\n🚨 NGROK TUNNEL IS OFFLINE!');
+                  console.error('The ngrok tunnel has expired or is not running.');
+                  console.error('To fix this:');
+                  console.error('1. Start the backend server locally: bun run backend/server.ts');
+                  console.error('2. The app will use localhost instead of ngrok');
+                  console.error('3. Or restart ngrok if you need external access');
+                  console.error('\n💡 The app will continue working with demo data\n');
+                }
+                
+                throw new TRPCClientError(`[NGROK_OFFLINE] The ngrok tunnel is offline. Start backend server with: bun run backend/server.ts`);
+              }
+              
               if (!isBackendDown) {
                 isBackendDown = true;
                 backendDownSince = Date.now();
@@ -1235,12 +1266,17 @@ export const trpcClient = trpc.createClient({
             
             // Enhance network errors with helpful messages
             if (error.name === 'TypeError' && error.message.includes('fetch')) {
-              throw new TRPCClientError(
-                `[NETWORK_ERROR] Cannot connect to tRPC server at ${url}. ` +
-                'Backend server is not running or not accessible. ' +
-                'The app will use demo data until the backend is available. ' +
-                `Original error: ${error.message}`
-              );
+              let errorMessage = `[NETWORK_ERROR] Cannot connect to tRPC server at ${url}. `;
+              
+              if (url.includes('.exp.direct')) {
+                errorMessage += 'Ngrok tunnel is offline. Start backend server with: bun run backend/server.ts';
+              } else {
+                errorMessage += 'Backend server is not running or not accessible. The app will use demo data until the backend is available.';
+              }
+              
+              errorMessage += ` Original error: ${error.message}`;
+              
+              throw new TRPCClientError(errorMessage);
             }
             
             throw error;
