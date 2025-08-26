@@ -506,8 +506,8 @@ const getRestApiUrl = () => {
     return apiUrl.replace(/\/$/, '');
   }
   
-  // Fallback to your Rork domain
-  return 'https://your-rork-domain.com'; // Replace with actual Rork domain
+  // Fallback to demo mode - no external API calls
+  return null;
 };
 
 // REST Client for Rork endpoints
@@ -520,32 +520,42 @@ class RestClient {
   }
   
   private async request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
+    // If no base URL is configured, throw an error immediately
+    if (!this.baseUrl) {
+      throw new Error('No API URL configured - running in demo mode');
+    }
+    
     const url = `${this.baseUrl}${endpoint}`;
     console.log('[REST] Making request to:', url);
     
-    const response = await fetch(url, {
-      headers: {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-        ...options.headers,
-      },
-      ...options,
-    });
-    
-    if (!response.ok) {
-      const text = await response.text();
-      console.error('[REST] Request failed:', response.status, text);
-      throw new Error(`HTTP ${response.status}: ${text}`);
+    try {
+      const response = await fetch(url, {
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          ...options.headers,
+        },
+        ...options,
+      });
+      
+      if (!response.ok) {
+        const text = await response.text();
+        console.error('[REST] Request failed:', response.status, text);
+        throw new Error(`HTTP ${response.status}: ${text}`);
+      }
+      
+      const contentType = response.headers.get('content-type') || '';
+      if (!contentType.includes('application/json')) {
+        const text = await response.text();
+        console.error('[REST] Non-JSON response:', text.substring(0, 200));
+        throw new Error('Expected JSON response but received: ' + contentType);
+      }
+      
+      return response.json();
+    } catch (error) {
+      console.error('[REST] Request error:', error);
+      throw error;
     }
-    
-    const contentType = response.headers.get('content-type') || '';
-    if (!contentType.includes('application/json')) {
-      const text = await response.text();
-      console.error('[REST] Non-JSON response:', text.substring(0, 200));
-      throw new Error('Expected JSON response but received: ' + contentType);
-    }
-    
-    return response.json();
   }
   
   // OAuth endpoints
@@ -997,7 +1007,7 @@ export const testBackendConnection = async (): Promise<{ success: boolean; messa
     console.log('[tRPC] Testing backend connection to:', healthUrl);
     
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 3000); // 3 second timeout (faster)
+    const timeoutId = setTimeout(() => controller.abort(), 2000); // 2 second timeout (faster)
     
     const response = await fetch(healthUrl, {
       method: 'GET',
@@ -1017,7 +1027,7 @@ export const testBackendConnection = async (): Promise<{ success: boolean; messa
       console.error('[tRPC] Health check failed:', text.substring(0, 200));
       return {
         success: false,
-        message: `Backend health check failed: ${response.status} ${response.statusText}`,
+        message: `Backend server not responding (${response.status})`,
         details: { status: response.status, response: text.substring(0, 200) }
       };
     }
@@ -1028,7 +1038,7 @@ export const testBackendConnection = async (): Promise<{ success: boolean; messa
       console.error('[tRPC] Health check returned non-JSON:', text.substring(0, 200));
       return {
         success: false,
-        message: 'Backend returned non-JSON response',
+        message: 'Backend server not running - start with: bun run backend/server.ts',
         details: { contentType, response: text.substring(0, 200) }
       };
     }
@@ -1044,12 +1054,12 @@ export const testBackendConnection = async (): Promise<{ success: boolean; messa
   } catch (error) {
     console.error('[tRPC] Backend connection test failed:', error);
     
-    let message = 'Cannot connect to backend';
+    let message = 'Backend server not running';
     if (error instanceof Error) {
       if (error.name === 'AbortError') {
-        message = 'Backend connection timeout (3s)';
+        message = 'Backend connection timeout - server may not be running';
       } else if (error.message.includes('fetch') || error.message.includes('Failed to fetch')) {
-        message = 'Network error - backend server not running';
+        message = 'Backend server not running - start with: bun run backend/server.ts';
       } else {
         message = error.message;
       }

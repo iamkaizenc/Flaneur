@@ -18,7 +18,7 @@ export function BackendStatusIndicator({ style, showDetails = false }: BackendSt
   };
 
   if (!showDetails && isBackendAvailable) {
-    return null; // Don't show indicator when everything is working
+    return null;
   }
 
   return (
