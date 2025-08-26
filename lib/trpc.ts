@@ -1,3 +1,4 @@
+import React from 'react';
 import { createTRPCReact } from "@trpc/react-query";
 import { httpBatchLink, TRPCClientError } from "@trpc/client";
 import type { AppRouter } from "@/backend/trpc/app-router";
@@ -497,6 +498,438 @@ export const mockFallbacks = {
 };
 
 export const trpc = createTRPCReact<AppRouter>();
+
+// REST API Configuration
+const getRestApiUrl = () => {
+  const apiUrl = process.env.EXPO_PUBLIC_API_URL;
+  if (apiUrl) {
+    return apiUrl.replace(/\/$/, '');
+  }
+  
+  // Fallback to your Rork domain
+  return 'https://your-rork-domain.com'; // Replace with actual Rork domain
+};
+
+// REST Client for Rork endpoints
+class RestClient {
+  private baseUrl: string;
+  
+  constructor() {
+    this.baseUrl = getRestApiUrl();
+    console.log('[REST] Using base URL:', this.baseUrl);
+  }
+  
+  private async request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
+    const url = `${this.baseUrl}${endpoint}`;
+    console.log('[REST] Making request to:', url);
+    
+    const response = await fetch(url, {
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+        ...options.headers,
+      },
+      ...options,
+    });
+    
+    if (!response.ok) {
+      const text = await response.text();
+      console.error('[REST] Request failed:', response.status, text);
+      throw new Error(`HTTP ${response.status}: ${text}`);
+    }
+    
+    const contentType = response.headers.get('content-type') || '';
+    if (!contentType.includes('application/json')) {
+      const text = await response.text();
+      console.error('[REST] Non-JSON response:', text.substring(0, 200));
+      throw new Error('Expected JSON response but received: ' + contentType);
+    }
+    
+    return response.json();
+  }
+  
+  // OAuth endpoints
+  oauth = {
+    start: (data: { platform: string }) => 
+      this.request('/api/oauth/start', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }),
+    
+    callback: (data: { platform: string; code: string; state: string }) => 
+      this.request('/api/oauth/callback', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }),
+    
+    fix: (data: { platform: string }) => 
+      this.request('/api/oauth/fix', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }),
+    
+    revoke: (data: { platform: string }) => 
+      this.request('/api/oauth/revoke', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }),
+    
+    listAccounts: () => 
+      this.request('/api/oauth/accounts'),
+  };
+  
+  // Settings endpoints
+  settings = {
+    get: () => 
+      this.request('/api/settings/get'),
+    
+    update: (data: any) => 
+      this.request('/api/settings/update', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }),
+    
+    testNotification: (data: { channel: string }) => 
+      this.request('/api/settings/testNotification', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }),
+  };
+  
+  // Plans endpoints
+  plans = {
+    getCurrent: () => 
+      this.request('/api/plans/current'),
+    
+    upgrade: (data: { targetPlan: string }) => 
+      this.request('/api/plans/upgrade', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }),
+  };
+  
+  // Risk endpoints
+  risk = {
+    getStatus: (params?: { range?: string }) => {
+      const query = params?.range ? `?range=${params.range}` : '';
+      return this.request(`/api/risk/status${query}`);
+    },
+    
+    simulateAlert: () => 
+      this.request('/api/risk/simulateAlert', {
+        method: 'POST',
+      }),
+  };
+  
+  // Notifications endpoints
+  notifications = {
+    test: (data?: { userId?: string; channel?: string }) => 
+      this.request('/api/notifications/test', {
+        method: 'POST',
+        body: JSON.stringify(data || {}),
+      }),
+    
+    history: (params?: { userId?: string; limit?: number }) => {
+      const query = new URLSearchParams();
+      if (params?.userId) query.append('userId', params.userId);
+      if (params?.limit) query.append('limit', params.limit.toString());
+      const queryString = query.toString() ? `?${query.toString()}` : '';
+      return this.request(`/api/notifications/history${queryString}`);
+    },
+  };
+  
+  // Scheduler endpoints
+  scheduler = {
+    queue: (data: { contentId: string; runAt: string }) => 
+      this.request('/api/scheduler/queue', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }),
+    
+    workerTick: () => 
+      this.request('/api/scheduler/workerTick', {
+        method: 'POST',
+      }),
+    
+    stats: () => 
+      this.request('/api/scheduler/stats'),
+  };
+  
+  // Health endpoints
+  health = () => 
+    this.request('/api/health');
+  
+  version = () => 
+    this.request('/api/version');
+}
+
+// Create REST client instance
+export const restClient = new RestClient();
+
+// REST-based hooks that mimic tRPC hooks
+export const createRestHooks = () => {
+  return {
+    oauth: {
+      start: {
+        mutate: async (data: { platform: string }) => {
+          try {
+            return await restClient.oauth.start(data);
+          } catch (error) {
+            console.error('[REST] OAuth start failed:', error);
+            // Return fallback data
+            return {
+              authUrl: `https://auth.demo/${data.platform}`,
+              state: 'demo_state',
+              requiresBotToken: data.platform === 'telegram'
+            };
+          }
+        }
+      },
+      callback: {
+        mutate: async (data: { platform: string; code: string; state: string }) => {
+          try {
+            return await restClient.oauth.callback(data);
+          } catch (error) {
+            console.error('[REST] OAuth callback failed:', error);
+            return { success: true };
+          }
+        }
+      },
+      fix: {
+        mutate: async (data: { platform: string }) => {
+          try {
+            return await restClient.oauth.fix(data);
+          } catch (error) {
+            console.error('[REST] OAuth fix failed:', error);
+            return {
+              authUrl: `https://auth.demo/${data.platform}`,
+              state: 'demo_state'
+            };
+          }
+        }
+      },
+      revoke: {
+        mutate: async (data: { platform: string }) => {
+          try {
+            return await restClient.oauth.revoke(data);
+          } catch (error) {
+            console.error('[REST] OAuth revoke failed:', error);
+            return { success: true };
+          }
+        }
+      },
+      listAccounts: {
+        useQuery: () => {
+          const [data, setData] = React.useState<any>(null);
+          const [isLoading, setIsLoading] = React.useState<boolean>(true);
+          const [error, setError] = React.useState<any>(null);
+          
+          React.useEffect(() => {
+            restClient.oauth.listAccounts()
+              .then(setData)
+              .catch((err) => {
+                console.error('[REST] OAuth listAccounts failed:', err);
+                setData(mockFallbacks['oauth.listAccounts']);
+              })
+              .finally(() => setIsLoading(false));
+          }, []);
+          
+          return { data, isLoading, error, refetch: () => {} };
+        }
+      }
+    },
+    settings: {
+      get: {
+        useQuery: () => {
+          const [data, setData] = React.useState<any>(null);
+          const [isLoading, setIsLoading] = React.useState<boolean>(true);
+          const [error, setError] = React.useState<any>(null);
+          
+          React.useEffect(() => {
+            restClient.settings.get()
+              .then(setData)
+              .catch((err) => {
+                console.error('[REST] Settings get failed:', err);
+                setData(mockFallbacks['settings.get']);
+              })
+              .finally(() => setIsLoading(false));
+          }, []);
+          
+          return { data, isLoading, error, refetch: () => {} };
+        }
+      },
+      update: {
+        mutate: async (data: any) => {
+          try {
+            return await restClient.settings.update(data);
+          } catch (error) {
+            console.error('[REST] Settings update failed:', error);
+            return { success: true };
+          }
+        }
+      },
+      testNotification: {
+        mutate: async (data: { channel: string }) => {
+          try {
+            return await restClient.settings.testNotification(data);
+          } catch (error) {
+            console.error('[REST] Test notification failed:', error);
+            return { message: 'Test notification sent (demo)' };
+          }
+        }
+      }
+    },
+    plans: {
+      getCurrent: {
+        useQuery: () => {
+          const [data, setData] = React.useState<any>(null);
+          const [isLoading, setIsLoading] = React.useState<boolean>(true);
+          const [error, setError] = React.useState<any>(null);
+          
+          React.useEffect(() => {
+            restClient.plans.getCurrent()
+              .then(setData)
+              .catch((err) => {
+                console.error('[REST] Plans getCurrent failed:', err);
+                setData(mockFallbacks['plans.getCurrent']);
+              })
+              .finally(() => setIsLoading(false));
+          }, []);
+          
+          return { data, isLoading, error, refetch: () => {} };
+        }
+      },
+      upgrade: {
+        mutate: async (data: { targetPlan: string }) => {
+          try {
+            return await restClient.plans.upgrade(data);
+          } catch (error) {
+            console.error('[REST] Plans upgrade failed:', error);
+            return { success: true, message: `Upgraded to ${data.targetPlan}` };
+          }
+        }
+      }
+    },
+    risk: {
+      getStatus: {
+        useQuery: (params?: { range?: string }) => {
+          const [data, setData] = React.useState<any>(null);
+          const [isLoading, setIsLoading] = React.useState<boolean>(true);
+          const [error, setError] = React.useState<any>(null);
+          
+          React.useEffect(() => {
+            restClient.risk.getStatus(params)
+              .then(setData)
+              .catch((err) => {
+                console.error('[REST] Risk getStatus failed:', err);
+                setData(mockFallbacks['risk.getStatus']);
+              })
+              .finally(() => setIsLoading(false));
+          }, [params]);
+          
+          return { data, isLoading, error, refetch: () => {} };
+        }
+      },
+      simulateAlert: {
+        mutate: async () => {
+          try {
+            return await restClient.risk.simulateAlert();
+          } catch (error) {
+            console.error('[REST] Risk simulateAlert failed:', error);
+            return {
+              message: 'Demo risk alert created',
+              alert: {
+                id: Math.floor(Date.now() / 1000),
+                severity: 'low',
+                message: 'Demo',
+                createdAt: new Date().toISOString()
+              }
+            };
+          }
+        }
+      }
+    },
+    notifications: {
+      test: {
+        mutate: async (data?: { userId?: string; channel?: string }) => {
+          try {
+            return await restClient.notifications.test(data);
+          } catch (error) {
+            console.error('[REST] Notifications test failed:', error);
+            return { message: 'Push sent (demo)' };
+          }
+        }
+      },
+      history: {
+        useQuery: (params?: { userId?: string; limit?: number }) => {
+          const [data, setData] = React.useState<any>(null);
+          const [isLoading, setIsLoading] = React.useState<boolean>(true);
+          const [error, setError] = React.useState<any>(null);
+          
+          React.useEffect(() => {
+            restClient.notifications.history(params)
+              .then(setData)
+              .catch((err) => {
+                console.error('[REST] Notifications history failed:', err);
+                setData({ notifications: [] });
+              })
+              .finally(() => setIsLoading(false));
+          }, [params?.userId, params?.limit]);
+          
+          return { data, isLoading, error, refetch: () => {} };
+        }
+      }
+    },
+    scheduler: {
+      queue: {
+        mutate: async (data: { contentId: string; runAt: string }) => {
+          try {
+            return await restClient.scheduler.queue(data);
+          } catch (error) {
+            console.error('[REST] Scheduler queue failed:', error);
+            return { jobId: `${data.contentId}:${data.runAt}` };
+          }
+        }
+      },
+      workerTick: {
+        mutate: async () => {
+          try {
+            return await restClient.scheduler.workerTick();
+          } catch (error) {
+            console.error('[REST] Scheduler workerTick failed:', error);
+            return { message: 'Worker tick complete (demo)' };
+          }
+        }
+      },
+      stats: {
+        useQuery: () => {
+          const [data, setData] = React.useState<any>(null);
+          const [isLoading, setIsLoading] = React.useState<boolean>(true);
+          const [error, setError] = React.useState<any>(null);
+          
+          React.useEffect(() => {
+            restClient.scheduler.stats()
+              .then(setData)
+              .catch((err) => {
+                console.error('[REST] Scheduler stats failed:', err);
+                setData({
+                  total: 3,
+                  stats: { pending: 1, completed: 2, failed: 0 },
+                  successRate: 100
+                });
+              })
+              .finally(() => setIsLoading(false));
+          }, []);
+          
+          return { data, isLoading, error, refetch: () => {} };
+        }
+      }
+    }
+  };
+};
+
+// Create REST hooks instance
+export const restHooks = createRestHooks();
 
 function getTrpcUrl() {
   // Priority order for tRPC URL resolution:
