@@ -1183,7 +1183,8 @@ export const trpcClient = trpc.createClient({
               console.error('[TRPC] HTML Response received:', html.substring(0, 200));
               
               // Check for ngrok-specific errors
-              if (html.includes('ERR_NGROK_3200') || url.includes('.exp.direct')) {
+              const urlString = typeof url === 'string' ? url : url.toString();
+              if (html.includes('ERR_NGROK_3200') || urlString.includes('.exp.direct')) {
                 if (!isBackendDown) {
                   isBackendDown = true;
                   backendDownSince = Date.now();
@@ -1224,7 +1225,8 @@ export const trpcClient = trpc.createClient({
                 errorMessage += '. The server is returning a web page instead of API responses. Check if the backend is running and accessible.';
               }
               
-              errorMessage += ` Check if tRPC server is running at ${url}`;
+              const urlString = typeof url === 'string' ? url : url.toString();
+              errorMessage += ` Check if tRPC server is running at ${urlString}`;
               
               throw new TRPCClientError(errorMessage);
             }
@@ -1266,9 +1268,10 @@ export const trpcClient = trpc.createClient({
             
             // Enhance network errors with helpful messages
             if (error.name === 'TypeError' && error.message.includes('fetch')) {
-              let errorMessage = `[NETWORK_ERROR] Cannot connect to tRPC server at ${url}. `;
+              const urlString = typeof url === 'string' ? url : url.toString();
+              let errorMessage = `[NETWORK_ERROR] Cannot connect to tRPC server at ${urlString}. `;
               
-              if (url.includes('.exp.direct')) {
+              if (urlString.includes('.exp.direct')) {
                 errorMessage += 'Ngrok tunnel is offline. Start backend server with: bun run backend/server.ts';
               } else {
                 errorMessage += 'Backend server is not running or not accessible. The app will use demo data until the backend is available.';
