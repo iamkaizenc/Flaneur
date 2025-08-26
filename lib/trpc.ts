@@ -512,7 +512,7 @@ const getRestApiUrl = () => {
 
 // REST Client for Rork endpoints
 class RestClient {
-  private baseUrl: string;
+  private baseUrl: string | null;
   
   constructor() {
     this.baseUrl = getRestApiUrl();
