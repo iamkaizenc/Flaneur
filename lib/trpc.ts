@@ -1225,7 +1225,6 @@ export const trpcClient = trpc.createClient({
                 errorMessage += '. The server is returning a web page instead of API responses. Check if the backend is running and accessible.';
               }
               
-              const urlString = typeof url === 'string' ? url : url.toString();
               errorMessage += ` Check if tRPC server is running at ${urlString}`;
               
               throw new TRPCClientError(errorMessage);
