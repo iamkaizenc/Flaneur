@@ -1267,10 +1267,10 @@ export const trpcClient = trpc.createClient({
             
             // Enhance network errors with helpful messages
             if (error.name === 'TypeError' && error.message.includes('fetch')) {
-              const urlString = typeof url === 'string' ? url : url.toString();
-              let errorMessage = `[NETWORK_ERROR] Cannot connect to tRPC server at ${urlString}. `;
+              const requestUrl = typeof url === 'string' ? url : url.toString();
+              let errorMessage = `[NETWORK_ERROR] Cannot connect to tRPC server at ${requestUrl}. `;
               
-              if (urlString.includes('.exp.direct')) {
+              if (requestUrl.includes('.exp.direct')) {
                 errorMessage += 'Ngrok tunnel is offline. Start backend server with: bun run backend/server.ts';
               } else {
                 errorMessage += 'Backend server is not running or not accessible. The app will use demo data until the backend is available.';
