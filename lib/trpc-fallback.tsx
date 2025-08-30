@@ -36,18 +36,23 @@ export function BackendStatusProvider({ children }: BackendStatusProviderProps) 
       setUseFallbackData(!result.success);
       
       if (!result.success) {
-        setLastError(result.message);
-        console.warn('[Backend Status] Backend unavailable, using fallback data:', result.message);
+        setLastError('Backend server not running');
+        if (__DEV__) {
+          console.warn('[Backend Status] Backend unavailable, using demo data');
+        }
       } else {
         setLastError(null);
-        console.log('[Backend Status] Backend is available');
+        if (__DEV__) {
+          console.log('[Backend Status] Backend is available');
+        }
       }
-    } catch (error) {
-      const errorMessage = normalizeError(error);
+    } catch {
       setIsBackendAvailable(false);
       setUseFallbackData(true);
-      setLastError(errorMessage);
-      console.error('[Backend Status] Connection test failed:', errorMessage);
+      setLastError('Connection failed');
+      if (__DEV__) {
+        console.warn('[Backend Status] Connection test failed, using demo data');
+      }
     }
   };
 

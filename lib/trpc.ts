@@ -1208,6 +1208,7 @@ export const testBackendConnection = async (): Promise<{ success: boolean; messa
 // Create a fallback-aware tRPC client
 let isBackendDown = false;
 let backendDownSince: number | null = null;
+let hasShownBackendDownMessage = false;
 
 export const trpcClient = trpc.createClient({
   links: [
@@ -1216,64 +1217,48 @@ export const trpcClient = trpc.createClient({
       transformer: superjson,
       // Enhanced error handling and HTML response guard
       fetch(url, opts) {
-        console.log('[TRPC] Making request to:', url);
+        // Only log requests in development mode
+        if (__DEV__) {
+          console.log('[TRPC] Making request to:', url);
+        }
         
         return fetch(url, opts)
           .then(async (res) => {
-            console.log('[TRPC] Response status:', res.status, res.statusText);
+            if (__DEV__) {
+              console.log('[TRPC] Response status:', res.status, res.statusText);
+            }
             
             const ct = res.headers.get('content-type') || '';
             
             // Check if we got HTML instead of JSON
             if (ct.includes('text/html')) {
               const html = await res.text();
-              console.error('[TRPC] HTML Response received:', html.substring(0, 200));
               
               // Check for ngrok-specific errors
               const requestUrl = typeof url === 'string' ? url : url.toString();
               if (html.includes('ERR_NGROK_3200') || requestUrl.includes('.exp.direct')) {
-                if (!isBackendDown) {
-                  isBackendDown = true;
-                  backendDownSince = Date.now();
-                  
-                  console.error('\n🚨 NGROK TUNNEL IS OFFLINE!');
-                  console.error('The ngrok tunnel has expired or is not running.');
-                  console.error('To fix this:');
-                  console.error('1. Start the backend server locally: bun run backend/server.ts');
-                  console.error('2. The app will use localhost instead of ngrok');
-                  console.error('3. Or restart ngrok if you need external access');
-                  console.error('\n💡 The app will continue working with demo data\n');
+                if (!hasShownBackendDownMessage) {
+                  hasShownBackendDownMessage = true;
+                  console.warn('[tRPC] Ngrok tunnel is offline. Using demo data.');
                 }
                 
-                throw new TRPCClientError(`[NGROK_OFFLINE] The ngrok tunnel is offline. Start backend server with: bun run backend/server.ts`);
+                throw new TRPCClientError(`[NGROK_OFFLINE] The ngrok tunnel is offline.`);
               }
               
-              if (!isBackendDown) {
-                isBackendDown = true;
-                backendDownSince = Date.now();
-                
-                // Show helpful instructions only once
-                console.error('\n🚨 BACKEND SERVER NOT RUNNING!');
-                console.error('To start the backend server:');
-                console.error('1. Open a new terminal in your project directory');
-                console.error('2. Run: bun run backend/server.ts');
-                console.error('3. Or use: ./start-backend.sh (macOS/Linux)');
-                console.error('4. Wait for "✅ Flâneur API is running" message');
-                console.error('5. The app will automatically reconnect');
-                console.error('\n💡 The app will continue working with demo data\n');
+              if (!hasShownBackendDownMessage) {
+                hasShownBackendDownMessage = true;
+                console.warn('[tRPC] Backend server not running. Using demo data.');
+                console.log('[tRPC] To start backend: bun run backend/server.ts');
               }
               
-              // Provide helpful error message based on the HTML content
-              let errorMessage = `[HTML_RESPONSE] Expected JSON but received HTML: ${res.status} ${res.statusText}`;
+              // Provide concise error message
+              let errorMessage = `[HTML_RESPONSE] Expected JSON but received HTML: ${res.status}`;
               
               if (html.includes('Cannot GET')) {
-                errorMessage += '. The tRPC endpoint may not be properly configured or the server is not running.';
+                errorMessage += '. Backend server not running.';
               } else if (html.includes('<!DOCTYPE html>')) {
-                errorMessage += '. The server is returning a web page instead of API responses. Check if the backend is running and accessible.';
+                errorMessage += '. Backend server not accessible.';
               }
-              
-              const urlString = typeof url === 'string' ? url : url.toString();
-              errorMessage += ` Check if tRPC server is running at ${urlString}`;
               
               throw new TRPCClientError(errorMessage);
             }
@@ -1281,9 +1266,20 @@ export const trpcClient = trpc.createClient({
             // Check for other non-JSON responses
             if (!ct.includes('application/json') && res.status !== 204) {
               const text = await res.text();
-              console.error('[TRPC] Non-JSON response:', text.substring(0, 200));
+              
+              // Check if we got HTML instead of JSON (Expo dev server response)
+              if (text.includes('<!DOCTYPE html>') || text.includes('<html')) {
+                if (!hasShownBackendDownMessage) {
+                  hasShownBackendDownMessage = true;
+                  console.warn('[tRPC] Backend server not running. Using demo data.');
+                  console.log('[tRPC] To start backend: bun run backend/server.ts');
+                }
+                
+                throw new TRPCClientError(`[BACKEND_NOT_RUNNING] Backend server not running.`);
+              }
+              
               throw new TRPCClientError(
-                `[NON_JSON_RESPONSE] Expected JSON but received ${ct}: ${res.status} ${res.statusText}`
+                `[NON_JSON_RESPONSE] Expected JSON but received ${ct}: ${res.status}`
               );
             }
             
@@ -1291,40 +1287,26 @@ export const trpcClient = trpc.createClient({
             if (isBackendDown) {
               isBackendDown = false;
               backendDownSince = null;
+              hasShownBackendDownMessage = false;
               console.log('✅ Backend server is back online!');
             }
             return res;
           })
           .catch((error) => {
-            console.error('[TRPC] Fetch error:', error);
-            
-            if (!isBackendDown) {
-              isBackendDown = true;
-              backendDownSince = Date.now();
-              
-              // Show helpful instructions only once
-              console.error('\n🚨 BACKEND SERVER CONNECTION FAILED!');
-              console.error('To start the backend server:');
-              console.error('1. Open a new terminal in your project directory');
-              console.error('2. Run: bun run backend/server.ts');
-              console.error('3. Or use: ./start-backend.sh (macOS/Linux)');
-              console.error('4. Wait for "✅ Flâneur API is running" message');
-              console.error('5. The app will automatically reconnect');
-              console.error('\n💡 The app will continue working with demo data\n');
+            if (!hasShownBackendDownMessage) {
+              hasShownBackendDownMessage = true;
+              console.warn('[tRPC] Backend connection failed. Using demo data.');
+              console.log('[tRPC] To start backend: bun run backend/server.ts');
             }
             
-            // Enhance network errors with helpful messages
+            // Enhance network errors with concise messages
             if (error.name === 'TypeError' && error.message.includes('fetch')) {
               const requestUrl = typeof url === 'string' ? url : url.toString();
-              let errorMessage = `[NETWORK_ERROR] Cannot connect to tRPC server at ${requestUrl}. `;
+              let errorMessage = `[NETWORK_ERROR] Cannot connect to backend server.`;
               
               if (requestUrl.includes('.exp.direct')) {
-                errorMessage += 'Ngrok tunnel is offline. Start backend server with: bun run backend/server.ts';
-              } else {
-                errorMessage += 'Backend server is not running or not accessible. The app will use demo data until the backend is available.';
+                errorMessage = '[NGROK_OFFLINE] Ngrok tunnel is offline.';
               }
-              
-              errorMessage += ` Original error: ${error.message}`;
               
               throw new TRPCClientError(errorMessage);
             }
