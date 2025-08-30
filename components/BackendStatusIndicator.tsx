@@ -25,14 +25,14 @@ export function BackendStatusIndicator({ style, showDetails = false }: BackendSt
     <View style={[styles.container, style]}>
       <View style={styles.statusRow}>
         {isBackendAvailable ? (
-          <Wifi size={16} color={theme.colors.success} />
+          <Wifi size={16} color="#10B981" />
         ) : (
-          <WifiOff size={16} color={theme.colors.warning} />
+          <WifiOff size={16} color="#F59E0B" />
         )}
         
         <Text style={[
           styles.statusText,
-          { color: isBackendAvailable ? theme.colors.success : theme.colors.warning }
+          { color: isBackendAvailable ? "#10B981" : "#F59E0B" }
         ]}>
           {isBackendAvailable ? 'Backend Connected' : 'Backend Offline - Using Demo Data'}
         </Text>

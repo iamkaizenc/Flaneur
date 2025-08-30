@@ -207,3 +207,40 @@ export function useTRPCMutationWithFallback<T, TVariables>(
 
   return { mutate, isLoading, error };
 }
+
+// Enhanced tRPC query hook that automatically handles errors and provides fallback data
+export function useTRPCQueryWithFallback<T>(
+  queryKey: string,
+  queryResult: any // The result from trpc.something.useQuery()
+): { data: T | null; error: string | null; isLoading: boolean; refetch: () => void } {
+  const fallbackData = getFallbackData(queryKey) as T;
+  
+  // If the query failed but we have fallback data, use it
+  if (queryResult.error && fallbackData) {
+    console.log(`[tRPC Fallback] Using fallback data for failed query: ${queryKey}`);
+    return {
+      data: fallbackData,
+      error: null,
+      isLoading: false,
+      refetch: queryResult.refetch || (() => {})
+    };
+  }
+  
+  // If the query is loading and we have fallback data, show it while loading
+  if (queryResult.isLoading && fallbackData) {
+    return {
+      data: fallbackData,
+      error: null,
+      isLoading: true,
+      refetch: queryResult.refetch || (() => {})
+    };
+  }
+  
+  // Return the actual query result
+  return {
+    data: queryResult.data || null,
+    error: queryResult.error ? normalizeError(queryResult.error) : null,
+    isLoading: queryResult.isLoading || false,
+    refetch: queryResult.refetch || (() => {})
+  };
+}

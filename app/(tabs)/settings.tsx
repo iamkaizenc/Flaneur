@@ -55,6 +55,8 @@ import { trpc, trpcClient, testBackendConnection } from "@/lib/trpc";
 import { normalizeError } from "@/lib/errors";
 import { usePurchase } from "@/hooks/usePurchase";
 import { LanguagePicker } from "../../src/components/LanguagePicker";
+import { BackendStatusIndicator } from "@/components/BackendStatusIndicator";
+import { useTRPCQueryWithFallback } from "@/lib/trpc-fallback";
 
 interface SectionHeaderProps {
   title: string;
@@ -1013,6 +1015,9 @@ export default function SettingsScreen() {
           icon={<Wifi size={20} color={theme.colors.white} />} 
         />
         <View style={styles.section}>
+          <View style={styles.backendStatusContainer}>
+            <BackendStatusIndicator showDetails={true} />
+          </View>
           <SettingItem
             title="Test Backend Connection"
             subtitle="Check if the backend server is accessible"
@@ -2270,6 +2275,11 @@ const styles = StyleSheet.create({
     color: theme.colors.white,
   },
   languageSection: {
+    padding: theme.spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: theme.colors.gray[100],
+  },
+  backendStatusContainer: {
     padding: theme.spacing.md,
     borderBottomWidth: 1,
     borderBottomColor: theme.colors.gray[100],

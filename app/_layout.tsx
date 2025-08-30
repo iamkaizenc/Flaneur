@@ -8,7 +8,7 @@ import { I18nextProvider } from 'react-i18next';
 import i18n from '../src/i18n';
 import { LanguageProvider } from '../src/providers/LanguageProvider';
 import { AIMarketerProvider } from "@/providers/AIMarketerProvider";
-import { trpc, trpcClient, getFallbackData } from "@/lib/trpc";
+import { trpc, trpcClient, getFallbackData, testBackendConnection } from "@/lib/trpc";
 import { BackendStatusProvider } from "@/lib/trpc-fallback";
 import { theme } from "@/constants/theme";
 
@@ -111,6 +111,8 @@ const queryClient = new QueryClient({
         if (error?.message?.includes('tRPC') || 
             error?.message?.includes('Failed to fetch') ||
             error?.message?.includes('NETWORK_ERROR') ||
+            error?.message?.includes('HTML_RESPONSE') ||
+            error?.message?.includes('BACKEND_UNAVAILABLE') ||
             error?.data?.code === 'NETWORK_ERROR') {
           console.warn('[React Query] Network/tRPC error, not retrying:', error?.message);
           return false;
@@ -144,6 +146,8 @@ const queryClient = new QueryClient({
       retry: (failureCount, error: any) => {
         // Don't retry mutations on network errors
         if (error?.message?.includes('Failed to fetch') ||
+            error?.message?.includes('HTML_RESPONSE') ||
+            error?.message?.includes('BACKEND_UNAVAILABLE') ||
             error?.data?.code === 'NETWORK_ERROR') {
           return false;
         }
@@ -213,16 +217,16 @@ export default function RootLayout() {
   useEffect(() => {
     const testConnection = async () => {
       try {
-        console.log('[App] Testing tRPC connection...');
-        const response = await fetch('/api/health');
-        if (response.ok) {
-          const data = await response.json();
-          console.log('[App] API health check passed:', data);
+        console.log('[App] Testing backend connection...');
+        const result = await testBackendConnection();
+        if (result.success) {
+          console.log('[App] ✅ Backend connection successful');
         } else {
-          console.warn('[App] API health check failed:', response.status);
+          console.warn('[App] ⚠️ Backend connection failed, using demo data');
+          console.warn('[App] Details:', result.message);
         }
       } catch (error) {
-        console.warn('[App] API connection test failed:', error);
+        console.warn('[App] Backend connection test failed:', error);
         console.log('[App] App will use fallback data for offline functionality');
       }
     };

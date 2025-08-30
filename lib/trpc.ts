@@ -1182,7 +1182,8 @@ async function quickBackendTest(): Promise<boolean> {
   }
   
   try {
-    const baseUrl = getTrpcUrl().replace('/api/trpc', '').replace('/trpc', '');
+    const trpcUrl = getTrpcUrl();
+    const baseUrl = trpcUrl.replace('/api/trpc', '').replace('/trpc', '');
     const healthUrl = `${baseUrl}/api/health`;
     
     // Skip check for ngrok URLs as they're unreliable
@@ -1252,15 +1253,21 @@ export const trpcClient = trpc.createClient({
             
             // Log HTML response for debugging (only first time)
             if (!globalBackendStatus.hasShownError) {
-              console.error('[tRPC] Received HTML instead of JSON:', html.substring(0, 200));
+              console.error('[tRPC] Health check returned non-JSON content-type:', contentType);
+              console.error('[tRPC] Response body:', html.substring(0, 200));
               globalBackendStatus.hasShownError = true;
             }
             
-            throw new TRPCClientError('[HTML_RESPONSE] Expected JSON but received HTML: ' + response.status + '. Backend server not accessible.');
+            const urlString = typeof url === 'string' ? url : url.toString();
+            let errorMessage = '[HTML_RESPONSE] Expected JSON but received HTML: ' + response.status + '. The server is returning a web page instead of API responses. Check if the backend is running and accessible.';
+            errorMessage += ` Check if tRPC server is running at ${urlString}`;
+            
+            throw new TRPCClientError(errorMessage);
           }
           
           if (!contentType.includes('application/json') && response.status !== 204) {
-            throw new TRPCClientError(`[INVALID_CONTENT_TYPE] Expected JSON but received ${contentType}: ${response.status}`);
+            const urlString = typeof url === 'string' ? url : url.toString();
+            throw new TRPCClientError(`[INVALID_CONTENT_TYPE] Expected JSON but received ${contentType}: ${response.status}. Check if tRPC server is running at ${urlString}`);
           }
           
           // Mark backend as available on successful response
