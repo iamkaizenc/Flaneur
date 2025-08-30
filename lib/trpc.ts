@@ -972,9 +972,16 @@ function getTrpcUrl() {
 
   // Platform-specific fallbacks - avoid ngrok/exp.direct URLs
   if (typeof window !== 'undefined') {
-    // Web platform - proxy through Expo dev server
-    const fallbackUrl = '/api/trpc';
-    console.log('[TRPC] Using web fallback (proxied):', fallbackUrl);
+    // Web platform - try to proxy through current origin first
+    const currentOrigin = window.location.origin;
+    if (currentOrigin && !currentOrigin.includes('.exp.direct')) {
+      const fallbackUrl = `${currentOrigin}/api/trpc`;
+      console.log('[TRPC] Using web fallback (current origin):', fallbackUrl);
+      return fallbackUrl;
+    }
+    // If current origin is exp.direct, use localhost
+    const fallbackUrl = 'http://localhost:8787/api/trpc';
+    console.log('[TRPC] Using web fallback (localhost):', fallbackUrl);
     return fallbackUrl;
   } else {
     // Native platform - connect directly to backend server
@@ -1007,7 +1014,7 @@ export const testBackendConnection = async (): Promise<{ success: boolean; messa
       console.log('[tRPC] Skipping health check for ngrok URL:', trpcUrl);
       return {
         success: false,
-        message: 'Backend server not running - ngrok tunnel is offline. Start backend with: bun run backend/server.ts',
+        message: '🚨 BACKEND SERVER NOT RUNNING!\n\nTo start the backend server:\n1. Open a new terminal in your project directory\n2. Run: bun run backend/server.ts\n3. Or use: ./start-backend.sh (macOS/Linux)\n4. Wait for "✅ Flâneur API is running" message\n5. The app will automatically reconnect\n\n💡 The app will continue working with demo data',
         details: { url: trpcUrl, reason: 'ngrok_offline' }
       };
     }
@@ -1018,7 +1025,7 @@ export const testBackendConnection = async (): Promise<{ success: boolean; messa
     console.log('[tRPC] Testing backend connection to:', healthUrl);
     
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
+    const timeoutId = setTimeout(() => controller.abort(), 3000); // 3 second timeout
     
     const response = await fetch(healthUrl, {
       method: 'GET',
@@ -1032,24 +1039,20 @@ export const testBackendConnection = async (): Promise<{ success: boolean; messa
     clearTimeout(timeoutId);
     
     console.log('[tRPC] Health check response status:', response.status);
-    console.log('[tRPC] Health check response headers:', Object.fromEntries(response.headers.entries()));
     
     if (!response.ok) {
       const text = await response.text();
       console.error('[tRPC] Health check failed with status:', response.status);
-      console.error('[tRPC] Response body:', text.substring(0, 300));
       
       // Check if we got HTML (likely a 404 or error page from Expo dev server)
       if (text.includes('<!DOCTYPE html>') || text.includes('<html')) {
         return {
           success: false,
-          message: 'Backend server not running on port 8787. Start with: bun run backend/server.ts',
+          message: '🚨 BACKEND SERVER NOT RUNNING!\n\nTo start the backend server:\n1. Open a new terminal in your project directory\n2. Run: bun run backend/server.ts\n3. Or use: ./start-backend.sh (macOS/Linux)\n4. Wait for "✅ Flâneur API is running" message\n5. The app will automatically reconnect\n\n💡 The app will continue working with demo data',
           details: { 
             status: response.status, 
             reason: 'backend_not_running',
-            url: healthUrl,
-            response: text.substring(0, 200),
-            instruction: 'Open a new terminal and run: bun run backend/server.ts'
+            url: healthUrl
           }
         };
       }
@@ -1057,7 +1060,7 @@ export const testBackendConnection = async (): Promise<{ success: boolean; messa
       return {
         success: false,
         message: `Backend server error (${response.status}). Check server logs.`,
-        details: { status: response.status, response: text.substring(0, 200) }
+        details: { status: response.status }
       };
     }
     
@@ -1065,19 +1068,16 @@ export const testBackendConnection = async (): Promise<{ success: boolean; messa
     if (!contentType.includes('application/json')) {
       const text = await response.text();
       console.error('[tRPC] Health check returned non-JSON content-type:', contentType);
-      console.error('[tRPC] Response body:', text.substring(0, 300));
       
       // Check if we got HTML instead of JSON (Expo dev server response)
       if (text.includes('<!DOCTYPE html>') || text.includes('<html')) {
         return {
           success: false,
-          message: 'Backend server not running on port 8787. Start with: bun run backend/server.ts',
+          message: '🚨 BACKEND SERVER NOT RUNNING!\n\nTo start the backend server:\n1. Open a new terminal in your project directory\n2. Run: bun run backend/server.ts\n3. Or use: ./start-backend.sh (macOS/Linux)\n4. Wait for "✅ Flâneur API is running" message\n5. The app will automatically reconnect\n\n💡 The app will continue working with demo data',
           details: { 
             contentType, 
             reason: 'backend_not_running',
-            url: healthUrl,
-            response: text.substring(0, 200),
-            instruction: 'Open a new terminal and run: bun run backend/server.ts'
+            url: healthUrl
           }
         };
       }
@@ -1085,7 +1085,7 @@ export const testBackendConnection = async (): Promise<{ success: boolean; messa
       return {
         success: false,
         message: `Backend server returning unexpected content type: ${contentType}`,
-        details: { contentType, response: text.substring(0, 200) }
+        details: { contentType }
       };
     }
     
@@ -1100,22 +1100,17 @@ export const testBackendConnection = async (): Promise<{ success: boolean; messa
   } catch (error) {
     console.error('[tRPC] Backend connection test failed:', error);
     
-    let message = 'Backend server not running';
+    let message = '🚨 BACKEND SERVER CONNECTION FAILED!\n\nTo start the backend server:\n1. Open a new terminal in your project directory\n2. Run: bun run backend/server.ts\n3. Or use: ./start-backend.sh (macOS/Linux)\n4. Wait for "✅ Flâneur API is running" message\n5. The app will automatically reconnect\n\n💡 The app will continue working with demo data';
     let reason = 'unknown_error';
-    let instruction = 'Run: bun run backend/server.ts in a separate terminal';
     
     if (error instanceof Error) {
       if (error.name === 'AbortError') {
-        message = 'Backend connection timeout - server is not running on port 8787';
         reason = 'timeout';
       } else if (error.message.includes('fetch') || error.message.includes('Failed to fetch') || error.message.includes('ECONNREFUSED')) {
-        message = 'Backend server not running on port 8787 - connection refused';
         reason = 'connection_refused';
       } else if (error.message.includes('ERR_NGROK')) {
-        message = 'Ngrok tunnel is offline';
         reason = 'ngrok_offline';
       } else {
-        message = `Backend connection error: ${error.message}`;
         reason = 'network_error';
       }
     }
@@ -1126,8 +1121,7 @@ export const testBackendConnection = async (): Promise<{ success: boolean; messa
       details: { 
         error: error instanceof Error ? error.message : String(error),
         reason,
-        url: getTrpcUrl(),
-        instruction
+        url: getTrpcUrl()
       }
     };
   }
@@ -1219,7 +1213,7 @@ export const trpcClient = trpc.createClient({
       fetch(url, opts) {
         // Only log requests in development mode
         if (__DEV__) {
-          console.log('[TRPC] Making request to:', url);
+          console.log('[TRPC] Making request to:', typeof url === 'string' ? url : url.toString());
         }
         
         return fetch(url, opts)
@@ -1239,7 +1233,7 @@ export const trpcClient = trpc.createClient({
               if (html.includes('ERR_NGROK_3200') || requestUrl.includes('.exp.direct')) {
                 if (!hasShownBackendDownMessage) {
                   hasShownBackendDownMessage = true;
-                  console.warn('[tRPC] Ngrok tunnel is offline. Using demo data.');
+                  console.error('[tRPC] Health check failed: The endpoint is offline. ERR_NGROK_3200');
                 }
                 
                 throw new TRPCClientError(`[NGROK_OFFLINE] The ngrok tunnel is offline.`);
@@ -1247,18 +1241,23 @@ export const trpcClient = trpc.createClient({
               
               if (!hasShownBackendDownMessage) {
                 hasShownBackendDownMessage = true;
-                console.warn('[tRPC] Backend server not running. Using demo data.');
-                console.log('[tRPC] To start backend: bun run backend/server.ts');
+                console.error('[tRPC] Health check returned non-JSON content-type: text/html');
+                console.error('[tRPC] Response body:', html.substring(0, 200));
+                console.error('[TRPC] HTML Response received:', html.substring(0, 100));
+                console.error('🚨 BACKEND SERVER NOT RUNNING!');
+                console.error('To start the backend server:');
+                console.error('1. Open a new terminal in your project directory');
+                console.error('2. Run: bun run backend/server.ts');
+                console.error('3. Or use: ./start-backend.sh (macOS/Linux)');
+                console.error('4. Wait for "✅ Flâneur API is running" message');
+                console.error('5. The app will automatically reconnect');
+                console.error('💡 The app will continue working with demo data');
               }
               
-              // Provide concise error message
-              let errorMessage = `[HTML_RESPONSE] Expected JSON but received HTML: ${res.status}`;
-              
-              if (html.includes('Cannot GET')) {
-                errorMessage += '. Backend server not running.';
-              } else if (html.includes('<!DOCTYPE html>')) {
-                errorMessage += '. Backend server not accessible.';
-              }
+              // Provide detailed error message
+              let errorMessage = `[HTML_RESPONSE] Expected JSON but received HTML: ${res.status} . The server is returning a web page instead of API responses. Check if the backend is running and accessible.`;
+              const requestUrlString = typeof url === 'string' ? url : url.toString();
+              errorMessage += ` Check if tRPC server is running at ${requestUrlString}`;
               
               throw new TRPCClientError(errorMessage);
             }
@@ -1271,8 +1270,16 @@ export const trpcClient = trpc.createClient({
               if (text.includes('<!DOCTYPE html>') || text.includes('<html')) {
                 if (!hasShownBackendDownMessage) {
                   hasShownBackendDownMessage = true;
-                  console.warn('[tRPC] Backend server not running. Using demo data.');
-                  console.log('[tRPC] To start backend: bun run backend/server.ts');
+                  console.error('[tRPC] Backend connection test failed: TypeError: Failed to fetch');
+                  console.error('[TRPC] Fetch error: TypeError: Failed to fetch');
+                  console.error('🚨 BACKEND SERVER CONNECTION FAILED!');
+                  console.error('To start the backend server:');
+                  console.error('1. Open a new terminal in your project directory');
+                  console.error('2. Run: bun run backend/server.ts');
+                  console.error('3. Or use: ./start-backend.sh (macOS/Linux)');
+                  console.error('4. Wait for "✅ Flâneur API is running" message');
+                  console.error('5. The app will automatically reconnect');
+                  console.error('💡 The app will continue working with demo data');
                 }
                 
                 throw new TRPCClientError(`[BACKEND_NOT_RUNNING] Backend server not running.`);
@@ -1295,18 +1302,28 @@ export const trpcClient = trpc.createClient({
           .catch((error) => {
             if (!hasShownBackendDownMessage) {
               hasShownBackendDownMessage = true;
-              console.warn('[tRPC] Backend connection failed. Using demo data.');
-              console.log('[tRPC] To start backend: bun run backend/server.ts');
+              console.error('[tRPC] Backend connection test failed: TypeError: Failed to fetch');
+              console.error('[TRPC] Fetch error: TypeError: Failed to fetch');
+              console.error('🚨 BACKEND SERVER CONNECTION FAILED!');
+              console.error('To start the backend server:');
+              console.error('1. Open a new terminal in your project directory');
+              console.error('2. Run: bun run backend/server.ts');
+              console.error('3. Or use: ./start-backend.sh (macOS/Linux)');
+              console.error('4. Wait for "✅ Flâneur API is running" message');
+              console.error('5. The app will automatically reconnect');
+              console.error('💡 The app will continue working with demo data');
             }
             
-            // Enhance network errors with concise messages
+            // Enhance network errors with detailed messages
             if (error.name === 'TypeError' && error.message.includes('fetch')) {
-              const requestUrl = typeof url === 'string' ? url : url.toString();
+              const requestUrlString = typeof url === 'string' ? url : url.toString();
               let errorMessage = `[NETWORK_ERROR] Cannot connect to backend server.`;
               
-              if (requestUrl.includes('.exp.direct')) {
+              if (requestUrlString.includes('.exp.direct')) {
                 errorMessage = '[NGROK_OFFLINE] Ngrok tunnel is offline.';
               }
+              
+              errorMessage += ` Check if tRPC server is running at ${requestUrlString}`;
               
               throw new TRPCClientError(errorMessage);
             }
