@@ -732,7 +732,7 @@ export const createRestHooks = () => {
         useQuery: () => {
           const [data, setData] = React.useState<any>(null);
           const [isLoading, setIsLoading] = React.useState<boolean>(true);
-          const [error, setError] = React.useState<any>(null);
+          const [, setError] = React.useState<any>(null);
           
           React.useEffect(() => {
             restClient.oauth.listAccounts()
@@ -744,7 +744,7 @@ export const createRestHooks = () => {
               .finally(() => setIsLoading(false));
           }, []);
           
-          return { data, isLoading, error, refetch: () => {} };
+          return { data, isLoading, refetch: () => {} };
         }
       }
     },
@@ -753,7 +753,7 @@ export const createRestHooks = () => {
         useQuery: () => {
           const [data, setData] = React.useState<any>(null);
           const [isLoading, setIsLoading] = React.useState<boolean>(true);
-          const [error, setError] = React.useState<any>(null);
+          const [, setError] = React.useState<any>(null);
           
           React.useEffect(() => {
             restClient.settings.get()
@@ -765,7 +765,7 @@ export const createRestHooks = () => {
               .finally(() => setIsLoading(false));
           }, []);
           
-          return { data, isLoading, error, refetch: () => {} };
+          return { data, isLoading, refetch: () => {} };
         }
       },
       update: {
@@ -794,7 +794,7 @@ export const createRestHooks = () => {
         useQuery: () => {
           const [data, setData] = React.useState<any>(null);
           const [isLoading, setIsLoading] = React.useState<boolean>(true);
-          const [error, setError] = React.useState<any>(null);
+          const [, setError] = React.useState<any>(null);
           
           React.useEffect(() => {
             restClient.plans.getCurrent()
@@ -806,7 +806,7 @@ export const createRestHooks = () => {
               .finally(() => setIsLoading(false));
           }, []);
           
-          return { data, isLoading, error, refetch: () => {} };
+          return { data, isLoading, refetch: () => {} };
         }
       },
       upgrade: {
@@ -825,7 +825,7 @@ export const createRestHooks = () => {
         useQuery: (params?: { range?: string }) => {
           const [data, setData] = React.useState<any>(null);
           const [isLoading, setIsLoading] = React.useState<boolean>(true);
-          const [error, setError] = React.useState<any>(null);
+          const [, setError] = React.useState<any>(null);
           
           React.useEffect(() => {
             restClient.risk.getStatus(params)
@@ -837,7 +837,7 @@ export const createRestHooks = () => {
               .finally(() => setIsLoading(false));
           }, [params]);
           
-          return { data, isLoading, error, refetch: () => {} };
+          return { data, isLoading, refetch: () => {} };
         }
       },
       simulateAlert: {
@@ -874,7 +874,7 @@ export const createRestHooks = () => {
         useQuery: (params?: { userId?: string; limit?: number }) => {
           const [data, setData] = React.useState<any>(null);
           const [isLoading, setIsLoading] = React.useState<boolean>(true);
-          const [error, setError] = React.useState<any>(null);
+          const [, setError] = React.useState<any>(null);
           
           React.useEffect(() => {
             restClient.notifications.history(params)
@@ -884,9 +884,9 @@ export const createRestHooks = () => {
                 setData({ notifications: [] });
               })
               .finally(() => setIsLoading(false));
-          }, [params?.userId, params?.limit]);
+          }, [params]);
           
-          return { data, isLoading, error, refetch: () => {} };
+          return { data, isLoading, refetch: () => {} };
         }
       }
     },
@@ -915,7 +915,7 @@ export const createRestHooks = () => {
         useQuery: () => {
           const [data, setData] = React.useState<any>(null);
           const [isLoading, setIsLoading] = React.useState<boolean>(true);
-          const [error, setError] = React.useState<any>(null);
+          const [, setError] = React.useState<any>(null);
           
           React.useEffect(() => {
             restClient.scheduler.stats()
@@ -931,7 +931,7 @@ export const createRestHooks = () => {
               .finally(() => setIsLoading(false));
           }, []);
           
-          return { data, isLoading, error, refetch: () => {} };
+          return { data, isLoading, refetch: () => {} };
         }
       }
     }
@@ -1164,172 +1164,127 @@ export const testBackendConnection = async (): Promise<{ success: boolean; messa
 // };
 
 // Enhanced fallback system with better error handling
+// Global backend status tracking
+let globalBackendStatus = {
+  isAvailable: false,
+  lastCheck: 0,
+  checkInterval: 30000, // 30 seconds
+  hasShownError: false
+};
 
-// Quick backend availability test (removed unused function warning)
-// async function quickBackendTest(): Promise<boolean> {
-//   if (!shouldTestBackend()) {
-//     return backendAvailable;
-//   }
-//   
-//   try {
-//     const baseUrl = getTrpcUrl().replace('/api/trpc', '').replace('/trpc', '');
-//     const healthUrl = `${baseUrl}/api/health`;
-//     
-//     const response = await fetch(healthUrl, {
-//       method: 'GET',
-//       headers: { 'Accept': 'application/json' },
-//       signal: AbortSignal.timeout(5000) // 5 second timeout
-//     });
-//     
-//     backendAvailable = response.ok;
-//     lastBackendCheck = Date.now();
-//     
-//     if (backendAvailable) {
-//       console.log('[TRPC] Backend is available');
-//     } else {
-//       console.warn('[TRPC] Backend health check failed:', response.status);
-//     }
-//     
-//     return backendAvailable;
-//   } catch (error) {
-//     console.warn('[TRPC] Backend availability test failed:', error);
-//     backendAvailable = false;
-//     lastBackendCheck = Date.now();
-//     return false;
-//   }
-// }
+// Quick backend availability test
+async function quickBackendTest(): Promise<boolean> {
+  const now = Date.now();
+  
+  // Don't check too frequently
+  if (now - globalBackendStatus.lastCheck < globalBackendStatus.checkInterval) {
+    return globalBackendStatus.isAvailable;
+  }
+  
+  try {
+    const baseUrl = getTrpcUrl().replace('/api/trpc', '').replace('/trpc', '');
+    const healthUrl = `${baseUrl}/api/health`;
+    
+    // Skip check for ngrok URLs as they're unreliable
+    if (healthUrl.includes('.exp.direct')) {
+      globalBackendStatus.isAvailable = false;
+      globalBackendStatus.lastCheck = now;
+      return false;
+    }
+    
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 2000); // 2 second timeout
+    
+    const response = await fetch(healthUrl, {
+      method: 'GET',
+      headers: { 'Accept': 'application/json' },
+      signal: controller.signal
+    });
+    
+    clearTimeout(timeoutId);
+    
+    globalBackendStatus.isAvailable = response.ok && (response.headers.get('content-type')?.includes('application/json') || false);
+    globalBackendStatus.lastCheck = now;
+    
+    if (globalBackendStatus.isAvailable && globalBackendStatus.hasShownError) {
+      console.log('[TRPC] ✅ Backend is back online!');
+      globalBackendStatus.hasShownError = false;
+    }
+    
+    return globalBackendStatus.isAvailable;
+  } catch {
+    globalBackendStatus.isAvailable = false;
+    globalBackendStatus.lastCheck = now;
+    
+    if (!globalBackendStatus.hasShownError) {
+      console.warn('[TRPC] Backend unavailable, using demo data');
+      globalBackendStatus.hasShownError = true;
+    }
+    
+    return false;
+  }
+}
 
-// Create a fallback-aware tRPC client
-let isBackendDown = false;
-let backendDownSince: number | null = null;
-let hasShownBackendDownMessage = false;
-
+// Create a fallback-aware tRPC client with improved error handling
 export const trpcClient = trpc.createClient({
   links: [
     httpBatchLink({
       url: getTrpcUrl(),
       transformer: superjson,
-      // Enhanced error handling and HTML response guard
-      fetch(url, opts) {
-        // Only log requests in development mode
-        if (__DEV__) {
-          console.log('[TRPC] Making request to:', typeof url === 'string' ? url : url.toString());
+      // Enhanced error handling with graceful fallback
+      async fetch(url, opts) {
+        // Check backend availability before making request
+        const isBackendAvailable = await quickBackendTest();
+        
+        if (!isBackendAvailable) {
+          // Throw a specific error that can be caught and handled with fallback data
+          throw new TRPCClientError('[BACKEND_UNAVAILABLE] Backend server not accessible. Using demo data.');
         }
         
-        return fetch(url, opts)
-          .then(async (res) => {
-            if (__DEV__) {
-              console.log('[TRPC] Response status:', res.status, res.statusText);
+        try {
+          const response = await fetch(url, opts);
+          
+          // Check response content type
+          const contentType = response.headers.get('content-type') || '';
+          
+          if (contentType.includes('text/html')) {
+            const html = await response.text();
+            
+            // Log HTML response for debugging (only first time)
+            if (!globalBackendStatus.hasShownError) {
+              console.error('[tRPC] Received HTML instead of JSON:', html.substring(0, 200));
+              globalBackendStatus.hasShownError = true;
             }
             
-            const ct = res.headers.get('content-type') || '';
-            
-            // Check if we got HTML instead of JSON
-            if (ct.includes('text/html')) {
-              const html = await res.text();
-              
-              // Check for ngrok-specific errors
-              const requestUrl = typeof url === 'string' ? url : url.toString();
-              if (html.includes('ERR_NGROK_3200') || requestUrl.includes('.exp.direct')) {
-                if (!hasShownBackendDownMessage) {
-                  hasShownBackendDownMessage = true;
-                  console.error('[tRPC] Health check failed: The endpoint is offline. ERR_NGROK_3200');
-                }
-                
-                throw new TRPCClientError(`[NGROK_OFFLINE] The ngrok tunnel is offline.`);
-              }
-              
-              if (!hasShownBackendDownMessage) {
-                hasShownBackendDownMessage = true;
-                console.error('[tRPC] Health check returned non-JSON content-type: text/html');
-                console.error('[tRPC] Response body:', html.substring(0, 200));
-                console.error('[TRPC] HTML Response received:', html.substring(0, 100));
-                console.error('🚨 BACKEND SERVER NOT RUNNING!');
-                console.error('To start the backend server:');
-                console.error('1. Open a new terminal in your project directory');
-                console.error('2. Run: bun run backend/server.ts');
-                console.error('3. Or use: ./start-backend.sh (macOS/Linux)');
-                console.error('4. Wait for "✅ Flâneur API is running" message');
-                console.error('5. The app will automatically reconnect');
-                console.error('💡 The app will continue working with demo data');
-              }
-              
-              // Provide detailed error message
-              let errorMessage = `[HTML_RESPONSE] Expected JSON but received HTML: ${res.status} . The server is returning a web page instead of API responses. Check if the backend is running and accessible.`;
-              const requestUrlString = typeof url === 'string' ? url : url.toString();
-              errorMessage += ` Check if tRPC server is running at ${requestUrlString}`;
-              
-              throw new TRPCClientError(errorMessage);
-            }
-            
-            // Check for other non-JSON responses
-            if (!ct.includes('application/json') && res.status !== 204) {
-              const text = await res.text();
-              
-              // Check if we got HTML instead of JSON (Expo dev server response)
-              if (text.includes('<!DOCTYPE html>') || text.includes('<html')) {
-                if (!hasShownBackendDownMessage) {
-                  hasShownBackendDownMessage = true;
-                  console.error('[tRPC] Backend connection test failed: TypeError: Failed to fetch');
-                  console.error('[TRPC] Fetch error: TypeError: Failed to fetch');
-                  console.error('🚨 BACKEND SERVER CONNECTION FAILED!');
-                  console.error('To start the backend server:');
-                  console.error('1. Open a new terminal in your project directory');
-                  console.error('2. Run: bun run backend/server.ts');
-                  console.error('3. Or use: ./start-backend.sh (macOS/Linux)');
-                  console.error('4. Wait for "✅ Flâneur API is running" message');
-                  console.error('5. The app will automatically reconnect');
-                  console.error('💡 The app will continue working with demo data');
-                }
-                
-                throw new TRPCClientError(`[BACKEND_NOT_RUNNING] Backend server not running.`);
-              }
-              
-              throw new TRPCClientError(
-                `[NON_JSON_RESPONSE] Expected JSON but received ${ct}: ${res.status}`
-              );
-            }
-            
-            // Mark backend as available if we get here
-            if (isBackendDown) {
-              isBackendDown = false;
-              backendDownSince = null;
-              hasShownBackendDownMessage = false;
-              console.log('✅ Backend server is back online!');
-            }
-            return res;
-          })
-          .catch((error) => {
-            if (!hasShownBackendDownMessage) {
-              hasShownBackendDownMessage = true;
-              console.error('[tRPC] Backend connection test failed: TypeError: Failed to fetch');
-              console.error('[TRPC] Fetch error: TypeError: Failed to fetch');
-              console.error('🚨 BACKEND SERVER CONNECTION FAILED!');
-              console.error('To start the backend server:');
-              console.error('1. Open a new terminal in your project directory');
-              console.error('2. Run: bun run backend/server.ts');
-              console.error('3. Or use: ./start-backend.sh (macOS/Linux)');
-              console.error('4. Wait for "✅ Flâneur API is running" message');
-              console.error('5. The app will automatically reconnect');
-              console.error('💡 The app will continue working with demo data');
-            }
-            
-            // Enhance network errors with detailed messages
-            if (error.name === 'TypeError' && error.message.includes('fetch')) {
-              const requestUrlString = typeof url === 'string' ? url : url.toString();
-              let errorMessage = `[NETWORK_ERROR] Cannot connect to backend server.`;
-              
-              if (requestUrlString.includes('.exp.direct')) {
-                errorMessage = '[NGROK_OFFLINE] Ngrok tunnel is offline.';
-              }
-              
-              errorMessage += ` Check if tRPC server is running at ${requestUrlString}`;
-              
-              throw new TRPCClientError(errorMessage);
-            }
-            
+            throw new TRPCClientError('[HTML_RESPONSE] Expected JSON but received HTML: ' + response.status + '. Backend server not accessible.');
+          }
+          
+          if (!contentType.includes('application/json') && response.status !== 204) {
+            throw new TRPCClientError(`[INVALID_CONTENT_TYPE] Expected JSON but received ${contentType}: ${response.status}`);
+          }
+          
+          // Mark backend as available on successful response
+          if (!globalBackendStatus.isAvailable) {
+            globalBackendStatus.isAvailable = true;
+            console.log('[TRPC] ✅ Backend connection restored!');
+          }
+          
+          return response;
+        } catch (error) {
+          // Mark backend as unavailable
+          globalBackendStatus.isAvailable = false;
+          
+          if (error instanceof TRPCClientError) {
             throw error;
-          });
+          }
+          
+          // Handle network errors
+          if (error instanceof TypeError && error.message.includes('fetch')) {
+            throw new TRPCClientError('[NETWORK_ERROR] Cannot connect to backend server.');
+          }
+          
+          throw new TRPCClientError(`[UNKNOWN_ERROR] ${error instanceof Error ? error.message : String(error)}`);
+        }
       },
     }),
   ],
@@ -1345,10 +1300,10 @@ export const getFallbackData = (queryKey: string) => {
 };
 
 // Helper function to check if backend is currently down
-export const isBackendCurrentlyDown = () => isBackendDown;
+export const isBackendCurrentlyDown = () => !globalBackendStatus.isAvailable;
 
 // Helper function to get how long backend has been down
 export const getBackendDowntime = () => {
-  if (!isBackendDown || !backendDownSince) return 0;
-  return Date.now() - backendDownSince;
+  if (globalBackendStatus.isAvailable) return 0;
+  return Date.now() - globalBackendStatus.lastCheck;
 };
