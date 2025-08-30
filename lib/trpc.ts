@@ -1018,7 +1018,7 @@ export const testBackendConnection = async (): Promise<{ success: boolean; messa
     console.log('[tRPC] Testing backend connection to:', healthUrl);
     
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 3000); // 3 second timeout
+    const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
     
     const response = await fetch(healthUrl, {
       method: 'GET',
@@ -1039,16 +1039,17 @@ export const testBackendConnection = async (): Promise<{ success: boolean; messa
       console.error('[tRPC] Health check failed with status:', response.status);
       console.error('[tRPC] Response body:', text.substring(0, 300));
       
-      // Check if we got HTML (likely a 404 or error page)
+      // Check if we got HTML (likely a 404 or error page from Expo dev server)
       if (text.includes('<!DOCTYPE html>') || text.includes('<html')) {
         return {
           success: false,
-          message: 'Backend server not running or health endpoint not found. Start backend with: bun run backend/server.ts',
+          message: 'Backend server not running on port 8787. Start with: bun run backend/server.ts',
           details: { 
             status: response.status, 
-            reason: 'html_response',
+            reason: 'backend_not_running',
             url: healthUrl,
-            response: text.substring(0, 200) 
+            response: text.substring(0, 200),
+            instruction: 'Open a new terminal and run: bun run backend/server.ts'
           }
         };
       }
@@ -1066,16 +1067,17 @@ export const testBackendConnection = async (): Promise<{ success: boolean; messa
       console.error('[tRPC] Health check returned non-JSON content-type:', contentType);
       console.error('[tRPC] Response body:', text.substring(0, 300));
       
-      // Check if we got HTML instead of JSON
+      // Check if we got HTML instead of JSON (Expo dev server response)
       if (text.includes('<!DOCTYPE html>') || text.includes('<html')) {
         return {
           success: false,
-          message: 'Backend server not running properly - receiving HTML instead of JSON. Start backend with: bun run backend/server.ts',
+          message: 'Backend server not running on port 8787. Start with: bun run backend/server.ts',
           details: { 
             contentType, 
-            reason: 'html_instead_of_json',
+            reason: 'backend_not_running',
             url: healthUrl,
-            response: text.substring(0, 200) 
+            response: text.substring(0, 200),
+            instruction: 'Open a new terminal and run: bun run backend/server.ts'
           }
         };
       }
@@ -1100,16 +1102,17 @@ export const testBackendConnection = async (): Promise<{ success: boolean; messa
     
     let message = 'Backend server not running';
     let reason = 'unknown_error';
+    let instruction = 'Run: bun run backend/server.ts in a separate terminal';
     
     if (error instanceof Error) {
       if (error.name === 'AbortError') {
-        message = 'Backend connection timeout - server may not be running';
+        message = 'Backend connection timeout - server is not running on port 8787';
         reason = 'timeout';
       } else if (error.message.includes('fetch') || error.message.includes('Failed to fetch') || error.message.includes('ECONNREFUSED')) {
-        message = 'Backend server not running - start with: bun run backend/server.ts';
+        message = 'Backend server not running on port 8787 - connection refused';
         reason = 'connection_refused';
       } else if (error.message.includes('ERR_NGROK')) {
-        message = 'Ngrok tunnel is offline - start backend with: bun run backend/server.ts';
+        message = 'Ngrok tunnel is offline';
         reason = 'ngrok_offline';
       } else {
         message = `Backend connection error: ${error.message}`;
@@ -1123,7 +1126,8 @@ export const testBackendConnection = async (): Promise<{ success: boolean; messa
       details: { 
         error: error instanceof Error ? error.message : String(error),
         reason,
-        url: getTrpcUrl()
+        url: getTrpcUrl(),
+        instruction
       }
     };
   }
@@ -1226,8 +1230,8 @@ export const trpcClient = trpc.createClient({
               console.error('[TRPC] HTML Response received:', html.substring(0, 200));
               
               // Check for ngrok-specific errors
-              const urlString = typeof url === 'string' ? url : url.toString();
-              if (html.includes('ERR_NGROK_3200') || urlString.includes('.exp.direct')) {
+              const requestUrl = typeof url === 'string' ? url : url.toString();
+              if (html.includes('ERR_NGROK_3200') || requestUrl.includes('.exp.direct')) {
                 if (!isBackendDown) {
                   isBackendDown = true;
                   backendDownSince = Date.now();
@@ -1268,7 +1272,7 @@ export const trpcClient = trpc.createClient({
                 errorMessage += '. The server is returning a web page instead of API responses. Check if the backend is running and accessible.';
               }
               
-              errorMessage += ` Check if tRPC server is running at ${urlString}`;
+              errorMessage += ` Check if tRPC server is running at ${requestUrl}`;
               
               throw new TRPCClientError(errorMessage);
             }
