@@ -1,29 +1,34 @@
-# Starting the Backend Server
+# 🚀 Starting the Backend Server
 
-The app is designed to work with demo data when the backend is not running, but you can start the backend server for full functionality.
+The tRPC backend server needs to be running for the app to work with live data. If you see a "Backend connection test failed" error, follow these steps:
 
 ## Quick Start
 
-### Option 1: Using the startup script (macOS/Linux)
-```bash
-./start-backend.sh
-```
-
-### Option 2: Using bun directly
+### Option 1: Direct Command
 ```bash
 bun run backend/server.ts
 ```
 
-### Option 3: Using package.json script (if available)
+### Option 2: Using Scripts
+
+**macOS/Linux:**
 ```bash
-bun run backend
+./start-backend.sh
 ```
 
-## What to expect
+**Windows:**
+```cmd
+start-backend.bat
+```
 
-When the backend starts successfully, you'll see:
+## What to Expect
+
+When the server starts successfully, you'll see:
 ```
 ✅ Flâneur API is running on http://localhost:8787
+Health check: http://localhost:8787/api/health
+tRPC endpoint: http://localhost:8787/api/trpc
+Ready for connections!
 ```
 
 The app will automatically detect when the backend comes online and switch from demo data to live data.

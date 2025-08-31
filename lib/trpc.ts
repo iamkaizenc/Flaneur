@@ -1014,7 +1014,7 @@ export const testBackendConnection = async (): Promise<{ success: boolean; messa
       console.log('[tRPC] Skipping health check for ngrok URL:', trpcUrl);
       return {
         success: false,
-        message: '🚨 BACKEND SERVER NOT RUNNING!\n\nTo start the backend server:\n1. Open a new terminal in your project directory\n2. Run: bun run backend/server.ts\n3. Or use: ./start-backend.sh (macOS/Linux)\n4. Wait for "✅ Flâneur API is running" message\n5. The app will automatically reconnect\n\n💡 The app will continue working with demo data',
+        message: '🚨 BACKEND SERVER NOT RUNNING!\n\nTo start the backend server:\n\n📱 OPTION 1 - Quick Start:\n1. Open a new terminal\n2. Run: bun run backend/server.ts\n\n🖥️ OPTION 2 - Using Scripts:\n• macOS/Linux: ./start-backend.sh\n• Windows: start-backend.bat\n\n✅ Wait for "Flâneur API is running" message\n🔄 The app will automatically reconnect\n\n💡 The app continues working with demo data',
         details: { url: trpcUrl, reason: 'ngrok_offline' }
       };
     }
@@ -1100,7 +1100,7 @@ export const testBackendConnection = async (): Promise<{ success: boolean; messa
   } catch (error) {
     console.error('[tRPC] Backend connection test failed:', error);
     
-    let message = '🚨 BACKEND SERVER CONNECTION FAILED!\n\nTo start the backend server:\n1. Open a new terminal in your project directory\n2. Run: bun run backend/server.ts\n3. Or use: ./start-backend.sh (macOS/Linux)\n4. Wait for "✅ Flâneur API is running" message\n5. The app will automatically reconnect\n\n💡 The app will continue working with demo data';
+    let message = '🚨 BACKEND SERVER CONNECTION FAILED!\n\nTo start the backend server:\n\n📱 OPTION 1 - Quick Start:\n1. Open a new terminal\n2. Run: bun run backend/server.ts\n\n🖥️ OPTION 2 - Using Scripts:\n• macOS/Linux: ./start-backend.sh\n• Windows: start-backend.bat\n\n✅ Wait for "Flâneur API is running" message\n🔄 The app will automatically reconnect\n\n💡 The app continues working with demo data';
     let reason = 'unknown_error';
     
     if (error instanceof Error) {
