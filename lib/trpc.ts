@@ -1169,7 +1169,9 @@ let globalBackendStatus = {
   isAvailable: false,
   lastCheck: 0,
   checkInterval: 30000, // 30 seconds
-  hasShownError: false
+  hasShownError: false,
+  consecutiveFailures: 0,
+  maxConsecutiveFailures: 3 // Only show errors after 3 consecutive failures
 };
 
 // Quick backend availability test
@@ -1190,6 +1192,7 @@ async function quickBackendTest(): Promise<boolean> {
     if (healthUrl.includes('.exp.direct')) {
       globalBackendStatus.isAvailable = false;
       globalBackendStatus.lastCheck = now;
+      globalBackendStatus.consecutiveFailures++;
       return false;
     }
     
@@ -1204,21 +1207,42 @@ async function quickBackendTest(): Promise<boolean> {
     
     clearTimeout(timeoutId);
     
-    globalBackendStatus.isAvailable = response.ok && (response.headers.get('content-type')?.includes('application/json') || false);
-    globalBackendStatus.lastCheck = now;
+    const isHealthy = response.ok && (response.headers.get('content-type')?.includes('application/json') || false);
     
-    if (globalBackendStatus.isAvailable && globalBackendStatus.hasShownError) {
-      console.log('[TRPC] ✅ Backend is back online!');
-      globalBackendStatus.hasShownError = false;
+    if (isHealthy) {
+      // Backend is healthy - reset failure count
+      globalBackendStatus.isAvailable = true;
+      globalBackendStatus.consecutiveFailures = 0;
+      globalBackendStatus.lastCheck = now;
+      
+      if (globalBackendStatus.hasShownError) {
+        console.log('[TRPC] ✅ Backend is back online!');
+        globalBackendStatus.hasShownError = false;
+      }
+      
+      return true;
+    } else {
+      // Backend responded but not healthy
+      globalBackendStatus.isAvailable = false;
+      globalBackendStatus.consecutiveFailures++;
+      globalBackendStatus.lastCheck = now;
+      
+      // Only show error after consecutive failures
+      if (globalBackendStatus.consecutiveFailures >= globalBackendStatus.maxConsecutiveFailures && !globalBackendStatus.hasShownError) {
+        console.warn('[TRPC] Backend unhealthy after multiple attempts, using demo data');
+        globalBackendStatus.hasShownError = true;
+      }
+      
+      return false;
     }
-    
-    return globalBackendStatus.isAvailable;
   } catch {
     globalBackendStatus.isAvailable = false;
+    globalBackendStatus.consecutiveFailures++;
     globalBackendStatus.lastCheck = now;
     
-    if (!globalBackendStatus.hasShownError) {
-      console.warn('[TRPC] Backend unavailable, using demo data');
+    // Only show error after consecutive failures
+    if (globalBackendStatus.consecutiveFailures >= globalBackendStatus.maxConsecutiveFailures && !globalBackendStatus.hasShownError) {
+      console.warn('[TRPC] Backend unavailable after multiple attempts, using demo data');
       globalBackendStatus.hasShownError = true;
     }
     
@@ -1251,8 +1275,8 @@ export const trpcClient = trpc.createClient({
           if (contentType.includes('text/html')) {
             const html = await response.text();
             
-            // Log HTML response for debugging (only first time)
-            if (!globalBackendStatus.hasShownError) {
+            // Log HTML response for debugging (only after consecutive failures)
+            if (globalBackendStatus.consecutiveFailures >= globalBackendStatus.maxConsecutiveFailures && !globalBackendStatus.hasShownError) {
               console.error('[tRPC] Health check returned non-JSON content-type:', contentType);
               console.error('[tRPC] Response body:', html.substring(0, 200));
               globalBackendStatus.hasShownError = true;
