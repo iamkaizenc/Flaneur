@@ -204,6 +204,10 @@ function RootLayoutNav() {
         title: "E2E Test",
         presentation: "modal" 
       }} />
+      <Stack.Screen name="oauth-test" options={{ 
+        title: "OAuth Test",
+        presentation: "modal" 
+      }} />
     </Stack>
   );
 }
