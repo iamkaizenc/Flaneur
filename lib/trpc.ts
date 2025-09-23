@@ -1100,7 +1100,7 @@ export const testBackendConnection = async (): Promise<{ success: boolean; messa
   } catch (error) {
     console.error('[tRPC] Backend connection test failed:', error);
     
-    let message = '🚨 BACKEND SERVER CONNECTION FAILED!\n\nTo start the backend server:\n\n📱 OPTION 1 - Quick Start:\n1. Open a new terminal\n2. Run: bun run backend/server.ts\n\n🖥️ OPTION 2 - Using Scripts:\n• macOS/Linux: ./start-backend.sh\n• Windows: start-backend.bat\n\n✅ Wait for "Flâneur API is running" message\n🔄 The app will automatically reconnect\n\n💡 The app continues working with demo data';
+    let message = '🚨 BACKEND SERVER CONNECTION FAILED!\n\nTo start the backend server:\n\n📱 OPTION 1 - Quick Start:\n1. Open a new terminal\n2. Run: bun run backend/server.ts\n\n🖥️ OPTION 2 - Using Scripts:\n• macOS/Linux: ./start-backend.sh\n• Windows: start-backend.bat\n\n✅ Wait for "✅ Flâneur API is running" message\n🔄 The app will automatically reconnect\n\n💡 The app continues working with demo data\n\n📖 See FIX_BACKEND_CONNECTION.md for details';
     let reason = 'unknown_error';
     
     if (error instanceof Error) {
