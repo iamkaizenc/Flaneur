@@ -19,6 +19,7 @@
     "@trpc/client": "^11.4.4",
     "@trpc/react-query": "^11.4.4",
     "@trpc/server": "^11.4.4",
+    "concurrently": "^9.2.1",
     "expo": "^53.0.4",
     "expo-blur": "~14.1.4",
     "expo-constants": "~17.1.4",
